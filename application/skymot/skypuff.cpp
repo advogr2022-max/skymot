@@ -20,6 +20,7 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QFileInfo>
+#include <QSettings>
 #include "skypuff.h"
 #include "utility.h"
 
@@ -45,12 +46,51 @@ Skypuff::Skypuff(VescInterface *v) : QObject(),
     clearStats();
 
     statsResponseTimes.setCapacity(aliveAvgN);
+
+    // First launch: seed ERPM defaults for FAST/SLOW test buttons (stored on the phone).
+    // If the user changes them later, their values are kept.
+    {
+        QSettings s;
+        if (!s.contains("skypuff/fast_erpm")) {
+            s.setValue("skypuff/fast_erpm", 20000);
+        }
+        if (!s.contains("skypuff/slow_erpm")) {
+            s.setValue("skypuff/slow_erpm", 3000);
+        }
+    }
 }
 
 void Skypuff::logVescDialog(const QString & title, const QString & text)
 {
     qWarning() << "-- VESC:" << title;
     qWarning() << "  --" << text;
+}
+
+// ERPM for the FAST/SLOW test buttons.
+// Stored on the phone only (QSettings, org "VESC" / app "VESC Application" from main.cpp).
+// These values are never sent to the VESC firmware.
+int Skypuff::fastErpm()
+{
+    QSettings s;
+    return s.value("skypuff/fast_erpm", 20000).toInt();
+}
+
+void Skypuff::setFastErpm(int v)
+{
+    QSettings s;
+    s.setValue("skypuff/fast_erpm", v);
+}
+
+int Skypuff::slowErpm()
+{
+    QSettings s;
+    return s.value("skypuff/slow_erpm", 3000).toInt();
+}
+
+void Skypuff::setSlowErpm(int v)
+{
+    QSettings s;
+    s.setValue("skypuff/slow_erpm", v);
 }
 
 void Skypuff::setState(const skypuff_state newState)

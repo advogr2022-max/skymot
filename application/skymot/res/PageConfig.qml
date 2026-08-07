@@ -733,6 +733,52 @@ Page {
                         }
                     }
                 }
+                GroupBox {
+                    title: qsTr("Test buttons (ERPM)")
+                    Layout.fillWidth: true
+                    Layout.margins: 10
+
+                    ColumnLayout {
+                        anchors.fill: parent
+
+                        RowLayout {
+                            Text {
+                                text: qsTr('FAST button ERPM (<a href="help">?</a>)')
+                                onLinkActivated: VescIf.emitMessageDialog(qsTr("FAST button speed"),
+                                                                          qsTr("Motor ERPM for the red FAST button on the control screen. Stored on the phone, not sent to the VESC."),
+                                                                          false, false);
+                            }
+                            Item {Layout.fillWidth: true}
+                            SpinBox {
+                                id: fastErpm
+                                editable: true
+                                from: 100
+                                to: 50000
+                                stepSize: 500
+                                value: Skypuff.fastErpm()
+                                onValueModified: Skypuff.setFastErpm(value)
+                            }
+                        }
+                        RowLayout {
+                            Text {
+                                text: qsTr('SLOW button ERPM (<a href="help">?</a>)')
+                                onLinkActivated: VescIf.emitMessageDialog(qsTr("SLOW button speed"),
+                                                                          qsTr("Motor ERPM for the green SLOW button on the control screen. Stored on the phone, not sent to the VESC."),
+                                                                          false, false);
+                            }
+                            Item {Layout.fillWidth: true}
+                            SpinBox {
+                                id: slowErpm
+                                editable: true
+                                from: 100
+                                to: 50000
+                                stepSize: 500
+                                value: Skypuff.slowErpm()
+                                onValueModified: Skypuff.setSlowErpm(value)
+                            }
+                        }
+                    }
+                }
             }
         }
     }

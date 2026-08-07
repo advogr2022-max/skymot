@@ -97,6 +97,13 @@ public:
     Q_INVOKABLE QString urlHost(const QString & u) {return QUrl(u).host();}
     Q_INVOKABLE int urlPort(const QString & u) {return QUrl(u).port();}
 
+    // ERPM for the FAST/SLOW test buttons.
+    // Stored on the phone (QSettings), NOT sent to the VESC (firmware doesn't know them).
+    Q_INVOKABLE int fastErpm();
+    Q_INVOKABLE void setFastErpm(int v);
+    Q_INVOKABLE int slowErpm();
+    Q_INVOKABLE void setSlowErpm(int v);
+
 signals:
     /* It is simple to work with QML text states:
      *

@@ -270,7 +270,7 @@ Page {
         RowLayout {
             Layout.topMargin: 15
 
-            // ===== TEST: красная кнопка FAST — 20000 ERPM, при перегрузке держит ток 150А =====
+            // ===== TEST: красная кнопка FAST — Skypuff.fastErpm() ERPM (настройка), при перегрузке держит ток 150А =====
             RoundButton {
                 id: rTestCurrent
                 Layout.topMargin: -5
@@ -286,7 +286,7 @@ Page {
                 enabled: ["DISCONNECTED", "UNINITIALIZED", "MANUAL_BRAKING", "MANUAL_SLOW",
                           "MANUAL_SLOW_SPEED_UP", "MANUAL_SLOW_BACK",
                           "MANUAL_SLOW_BACK_SPEED_UP", "UNWINDING", "REWINDING"].indexOf(Skypuff.state) !== -1
-                onPressed:  { fastCurrentMode = false; VescIf.commands().setRpm(20000) }
+                onPressed:  { fastCurrentMode = false; VescIf.commands().setRpm(Skypuff.fastErpm()) }
                 onReleased: { fastCurrentMode = false; VescIf.commands().setCurrent(0) }
             }
 
@@ -317,7 +317,7 @@ Page {
                 Layout.fillWidth: true
             }
 
-            // ===== TEST: зелёная кнопка SLOW — постоянные 3000 ERPM пока нажата =====
+            // ===== TEST: зелёная кнопка SLOW — постоянные Skypuff.slowErpm() ERPM пока нажата =====
             RoundButton {
                 id: rTestSpeed
                 Layout.topMargin: -5
@@ -333,7 +333,7 @@ Page {
                 enabled: ["DISCONNECTED", "UNINITIALIZED", "MANUAL_BRAKING", "MANUAL_SLOW",
                           "MANUAL_SLOW_SPEED_UP", "MANUAL_SLOW_BACK",
                           "MANUAL_SLOW_BACK_SPEED_UP", "UNWINDING", "REWINDING"].indexOf(Skypuff.state) !== -1
-                onPressed:  VescIf.commands().setRpm(3000)
+                onPressed:  VescIf.commands().setRpm(Skypuff.slowErpm())
                 onReleased: VescIf.commands().setCurrent(0)
             }
         }
@@ -350,7 +350,7 @@ Page {
                 if (fastCurrentMode) {
                     VescIf.commands().setCurrent(150)
                 } else {
-                    VescIf.commands().setRpm(20000)
+                    VescIf.commands().setRpm(Skypuff.fastErpm())
                 }
             }
         }
@@ -360,7 +360,7 @@ Page {
             interval: 100
             repeat: true
             running: rTestSpeed.pressed
-            onTriggered: VescIf.commands().setRpm(3000)
+            onTriggered: VescIf.commands().setRpm(Skypuff.slowErpm())
         }
 
         // Защита зелёной кнопки: ток > 150А → стоп
@@ -377,9 +377,9 @@ Page {
             }
         }
 
-        // Красная кнопка: скорость 20000 ERPM, при токе >150А переключаемся на удержание 150А,
+        // Красная кнопка: скорость Skypuff.fastErpm() ERPM, при токе >150А переключаемся на удержание 150А,
         // при спаде тока <140А (гистерезис) возвращаемся в скоростной режим,
-        // при разгоне выше 20000 ERPM в режиме тока — снижаем ток (возврат в RPM)
+        // при разгоне выше Skypuff.fastErpm() ERPM в режиме тока — снижаем ток (возврат в RPM)
         Connections {
             target: Skypuff
             onMotorKgChanged: {
@@ -390,15 +390,15 @@ Page {
                         VescIf.commands().setCurrent(150);
                     } else if (amps < 140 && fastCurrentMode) {
                         fastCurrentMode = false;
-                        VescIf.commands().setRpm(20000);
+                        VescIf.commands().setRpm(Skypuff.fastErpm());
                     }
                 }
             }
             onSpeedMsChanged: {
                 if (rTestCurrent.pressed && fastCurrentMode) {
-                    if (msToErpm(Skypuff.speedMs) > 20000) {
+                    if (msToErpm(Skypuff.speedMs) > Skypuff.fastErpm()) {
                         fastCurrentMode = false;
-                        VescIf.commands().setRpm(20000);  // VESC снизит ток, удерживая 20000 ERPM
+                        VescIf.commands().setRpm(Skypuff.fastErpm());  // VESC снизит ток, удерживая заданные ERPM
                     }
                 }
             }

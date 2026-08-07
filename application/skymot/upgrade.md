@@ -1,7 +1,7 @@
-# Skymot APK 1.0.3 — чеклист обновления для заказчика
+# Skymot APK 1.1.0 — чеклист обновления для заказчика
 
-Дата: 01.08.2026
-Версия APK: **1.0.3** (пакет `skymot.winch`, versionCode 103)
+Дата: 07.08.2026
+Версия APK: **1.1.0** (пакет `skymot.winch`, versionCode 110)
 Что это: обновление приложения управления лебёдкой (исходная база SkyPuff 4.00 / v6.05 ddosoff)
 
 ---
@@ -10,7 +10,9 @@
 
 В APK добавлены **две тестовые кнопки управления мотором** для проверки лебёдки
 на земле (без пилота на тросе), исправлены ошибки запуска (белый экран) и
-настроена сборка с полным набором QML-модулей Qt. Прошивка VESC **не изменялась**.
+настроена сборка с полным набором QML-модулей Qt. В v1.1.0 добавлены
+**настройки скоростей кнопок FAST/SLOW** прямо в приложении (экран настроек).
+Прошивка VESC **не изменялась**.
 
 ## 2. Что именно сделано (чеклист изменений)
 
@@ -18,12 +20,13 @@
 |---|---|---|
 | 1 | Исправлен краш при запуске (белый экран) | В `PageSkypuff.qml` добавлены импорты `Vedder.vesc.vescinterface`, `Vedder.vesc.commands`, `Vedder.vesc.configparams` и объявление `property ConfigParams cfg` — без них вызовы команд падали с `ReferenceError: VescIf is not defined` |
 | 2 | Доставлены QML-модули Qt | В тулчейн установлены `QtQuick.Controls` (1.4), `QtQuick.Extras`, `QtQuick.Dialogs`, `QtQuick.PrivateWidgets` — без них QML-страницы не грузились (краш) |
-| 3 | Кнопка **FAST** (красная, 100x100) | Нажата: команда `COMM_SET_RPM 20000` (20000 ERPM, повтор каждые 100 мс). Если трос идёт легко — ток малый. При токе > 150 А — переключение на удержание тока 150 А (`COMM_SET_CURRENT 150`). При разгоне выше 20000 ERPM в режиме тока — возврат в скоростной режим (VESC снижает ток, удерживая 20000 ERPM). Отпущена: `COMM_SET_CURRENT 0` |
-| 4 | Кнопка **SLOW** (зелёная, 100x100) | Нажата: `COMM_SET_RPM 3000` (3000 ERPM, повтор каждые 100 мс). При токе > 150 А — аварийная остановка (`COMM_SET_CURRENT 0`, кнопка гаснет). Отпущена: стоп |
+| 3 | Кнопка **FAST** (красная, 100x100) | Нажата: команда `COMM_SET_RPM fastErpm()` (по умолчанию 20000 ERPM, повтор каждые 100 мс). Если трос идёт легко — ток малый. При токе > 150 А — переключение на удержание тока 150 А (`COMM_SET_CURRENT 150`). При разгоне выше заданных ERPM в режиме тока — возврат в скоростной режим (VESC снижает ток). Отпущена: `COMM_SET_CURRENT 0` |
+| 4 | Кнопка **SLOW** (зелёная, 100x100) | Нажата: `COMM_SET_RPM slowErpm()` (по умолчанию 3000 ERPM, повтор каждые 100 мс). При токе > 150 А — аварийная остановка (`COMM_SET_CURRENT 0`, кнопка гаснет). Отпущена: стоп |
 | 5 | Блокировка кнопок по состоянию лебёдки | Кнопки активны в: `UNINITIALIZED`, `MANUAL_BRAKING`, `MANUAL_SLOW*`, `UNWINDING`, `REWINDING`, `DISCONNECTED`. Заблокированы (серые) в: `PULL`, `TAKEOFF`, `PRE_PULL`, `SLOWING`, `BRAKING`, `BRAKING_EXTENSION` — чтобы исключить конфликт команд с автоматикой (пилот на тросе) |
 | 6 | Диагностические логи | Были добавлены в `Commands::setCurrent/setRpm` (logcat: `CMD_SET_CURRENT`/`CMD_SET_RPM`) для отладки. **В финальной версии 1.0.3 удалены** — logcat чистый, на работу/производительность не влияет |
-| 7 | Пакет/версия | Пакет переименован `skypuff.winch` → `skymot.winch`, versionCode 103, minSdk 26 (Android 8+), targetSdk 34 |
-| 8 | Архитектуры | **Только arm64-v8a** (native-code), размер APK **~26.3 МБ** (< 30 МБ) — целевые устройства — современные Android-смартфоны |
+| 7 | Пакет/версия | Пакет переименован `skypuff.winch` → `skymot.winch`, versionCode 110, minSdk 26 (Android 8+), targetSdk 34 |
+| 8 | Архитектуры | **Только arm64-v8a** (native-code), размер APK **~26 МБ** (< 30 МБ) — целевые устройства — современные Android-смартфоны |
+| 9 | Настройки ERPM кнопок (новое в 1.1.0) | Внизу экрана настроек группа **"Test buttons (ERPM)"**: `FAST button ERPM` и `SLOW button ERPM`, диапазон **100–50000**, шаг 500. Сохраняются на смартфоне сразу при изменении; на VESC не отправляются |
 
 **Прошивка VESC: не изменялась.** В репозитории прошивки остаются только ранее
 согласованные правки (лимит rewinding 150 А, A/KG 4.54, max_speed 39 м/с) —
@@ -126,12 +129,12 @@ cd android-build
 
 ```bash
 cp ~/build_skypuff/android-build/build/outputs/apk/debug/android-build-debug.apk \
-   /mnt/d/skymot/Skymot-1.0.3.apk
+   /mnt/d/skymot/Skymot-1.1.0.apk
 ```
 
 Проверка метаданных (aapt из build-tools 28.0.3):
 ```
-package: name='skymot.winch' versionCode='103' versionName='1.0.3'
+package: name='skymot.winch' versionCode='110' versionName='1.1.0'
 sdkVersion:'26'
 native-code: 'arm64-v8a'
 ```
@@ -140,7 +143,7 @@ native-code: 'arm64-v8a'
 
 ### 5.1. Установка на телефон (Android 8+)
 
-1. Скопировать `Skymot-1.0.3.apk` на телефон.
+1. Скопировать `Skymot-1.1.0.apk` на телефон.
 2. Разрешить установку из неизвестных источников.
 3. Установить. Приложение появится как **Skymot** (иконка рядом с оригиналом SkyPuff 4.00 — оба работают независимо, пакеты разные).
 
@@ -149,7 +152,7 @@ native-code: 'arm64-v8a'
 ```bash
 # Официальный AVD (API 30, x86_64):
 D:\Android\Sdk\emulator\emulator.exe -avd skymot -gpu swiftshader_indirect -no-snapshot -no-boot-anim -no-audio
-adb -s emulator-5556 install -r D:\skymot\Skymot-1.0.3.apk
+adb -s emulator-5556 install -r D:\\skymot\\Skymot-1.1.0.apk
 adb -s emulator-5556 shell am start -n skymot.winch/org.qtproject.qt5.android.bindings.QtActivity
 # Поток команд при нажатии кнопок (нужен реальный VESC по BLE для приёма):
 adb -s emulator-5556 shell logcat -d | grep -E "CMD_SET"
@@ -159,16 +162,21 @@ adb -s emulator-5556 shell logcat -d | grep -E "CMD_SET"
 
 1. Подключить телефон к VESC по BLE (страница Connection).
 2. Убедиться, что лебёдка в состоянии `UNINITIALIZED` (после включения) — кнопки активны.
-3. **FAST** (красная): нажать — мотор набирает обороты до ~20000 ERPM
-   (≈38.8 м/с при poles=6, D=200 мм, gear=1.8). Лёгкий ход — ток малый.
+3. **FAST** (красная): нажать — мотор набирает обороты до заданных ERPM
+   (по умолчанию 20000 ≈ 38.8 м/с при poles=6, D=200 мм, gear=1.8). Лёгкий ход — ток малый.
    Затормозить барабан рукой — ток растёт до ~150 А и держится (тяга ~33 кгс),
-   скорость не превышает 20000 ERPM. Отпустить — мотор стоп.
-4. **SLOW** (зелёная): нажать — мотор крутит ~3000 ERPM (≈5.8 м/с).
+   скорость не превышает заданные ERPM. Отпустить — мотор стоп.
+4. **SLOW** (зелёная): нажать — мотор крутит заданные ERPM
+   (по умолчанию 3000 ≈ 5.8 м/с).
    Затормозить — при токе > 150 А автоматический стоп.
-5. Проверить на главном экране: метраж (шкала троса), кг (тяга), скорость
+5. **Настройка скоростей**: экран настроек (иконка шестерёнки) → внизу группа
+   "Test buttons (ERPM)" → задать FAST/SLOW ERPM (100–50000) → вернуться на
+   главный экран и проверить кнопки. Значения сохраняются на смартфоне,
+   переживают перезапуск приложения.
+6. Проверить на главном экране: метраж (шкала троса), кг (тяга), скорость
    обновляются при нажатиях.
-6. В logcat (или по телеметрии) убедиться в потоке команд:
-   `CMD_SET_RPM 20000` каждые ~100 мс при удержании, `CMD_SET_CURRENT 0` при отпускании.
+7. В logcat (или по телеметрии) убедиться в потоке команд:
+   `CMD_SET_RPM <заданные ERPM>` каждые ~100 мс при удержании, `CMD_SET_CURRENT 0` при отпускании.
 
 ### 5.4. Ограничения (важно донести до пользователя)
 
@@ -177,17 +185,18 @@ adb -s emulator-5556 shell logcat -d | grep -E "CMD_SET"
   используйте состояния `UNINITIALIZED` / ручные режимы / `UNWINDING`/`REWINDING`.
 - В `UNWINDING`/`REWINDING` прошивка может кратковременно вмешаться в управление
   в моменты своих событий (смена зоны, триггеры длины) — это нормально.
-- 20000 ERPM ≈ 38.8 м/с — проверяйте только с тросом, уложенным на земле.
+- 20000 ERPM ≈ 38.8 м/с (по умолчанию) — проверяйте только с тросом, уложенным на земле.
 - Прошивка VESC для работы override-логики НЕ требуется — всё реализовано в APK.
 
 ## 6. Файлы, затронутые правками (для контроля версий)
 
 | Файл | Правки |
 |---|---|
-| `vesc_tool_src/application/skypuff/res/PageSkypuff.qml` | Кнопки FAST/SLOW 100x100, логика гибрида 150 А, блокировка по состояниям, импорты VescIf/commands/configparams, `property cfg` |
-| `vesc_tool_src/application/skypuff/commands.cpp` | (в 1.0.2 был debug-лог, в 1.0.3 удалён — файл без изменений относительно базы) |
-| `vesc_tool_src/application/skypuff/skypuff.pro` | Версия 1.0.3, versionCode 103 |
-| `vesc_tool_src/application/skypuff/android/AndroidManifest.xml(.in)` | minSdk 26 (Android 8), версия 1.0.3 |
+| `vesc_tool_src/application/skypuff/res/PageSkypuff.qml` | Кнопки FAST/SLOW 100x100, логика гибрида 150 А, блокировка по состояниям, импорты VescIf/commands/configparams, `property cfg`; v1.1.0: ERPM читаются из настроек (`Skypuff.fastErpm()`/`slowErpm()`) вместо хардкода |
+| `vesc_tool_src/application/skypuff/res/PageConfig.qml` | (v1.1.0) Группа "Test buttons (ERPM)" внизу экрана настроек — поля FAST/SLOW ERPM 100–50000 |
+| `vesc_tool_src/application/skypuff/skypuff.h/.cpp` | (v1.1.0) Методы `fastErpm()/setFastErpm()/slowErpm()/setSlowErpm()` — хранение в QSettings смартфона (ключи `skypuff/fast_erpm`, `skypuff/slow_erpm`, дефолты 20000/3000) |
+| `vesc_tool_src/application/skypuff/skypuff.pro` | Версия 1.1.0, versionCode 110 |
+| `vesc_tool_src/application/skypuff/android/AndroidManifest.xml(.in)` | minSdk 26 (Android 8), версия 1.1.0 |
 | `~/Qt/5.15.2/android/qml/QtQuick/{Controls,Dialogs,Extras,PrivateWidgets}` | Доустановленный модуль qtquickcontrols (вне репозитория — в тулчейне!) |
 
 **Важно:** модуль qtquickcontrols живёт в тулчейне (`~/Qt/5.15.2/android/qml/`),
