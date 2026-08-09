@@ -76,6 +76,10 @@ class Skypuff : public QObject
     // Readable fault, empty if none
     Q_PROPERTY(QString fault READ getFaultTranslation NOTIFY faultChanged)
 
+    // True while a manual FAST/SLOW button is held (set from QML).
+    // The Fast Rewind auto-override suspends while this is true.
+    Q_PROPERTY(bool manualOverride READ manualOverride WRITE setManualOverride NOTIFY manualOverrideChanged)
+
     Q_PROPERTY(int minResponseMillis READ getMinResponseMillis NOTIFY minResponseMillisChanged)
     Q_PROPERTY(int maxResponseMillis READ getMaxResponseMillis NOTIFY maxResponseMillisChanged)
     Q_PROPERTY(float avgResponseMillis READ getAvgResponseMillis NOTIFY avgResponseMillisChanged)
@@ -104,6 +108,27 @@ public:
     Q_INVOKABLE int slowErpm();
     Q_INVOKABLE void setSlowErpm(int v);
 
+    // Fast Rewind (auto rewind override) settings.
+    // Stored on the phone (QSettings), NOT sent to the VESC (firmware doesn't know them).
+    Q_INVOKABLE bool fastRewind();
+    Q_INVOKABLE void setFastRewind(bool v);
+    Q_INVOKABLE int rewindErpm();
+    Q_INVOKABLE void setRewindErpm(int v);
+    Q_INVOKABLE int rewindMaxCurrent();
+    Q_INVOKABLE void setRewindMaxCurrent(int v);
+    Q_INVOKABLE int rewindSlowErpm();
+    Q_INVOKABLE void setRewindSlowErpm(int v);
+    Q_INVOKABLE int rewindSlowMaxCurrent();
+    Q_INVOKABLE void setRewindSlowMaxCurrent(int v);
+    Q_INVOKABLE int rewindSlowZone();
+    Q_INVOKABLE void setRewindSlowZone(int v);
+    Q_INVOKABLE double rewindRamp();
+    Q_INVOKABLE void setRewindRamp(double v);
+
+    // Manual override flag (FAST/SLOW buttons held). Runtime only, not persisted.
+    Q_INVOKABLE bool manualOverride() const;
+    Q_INVOKABLE void setManualOverride(bool v);
+
 signals:
     /* It is simple to work with QML text states:
      *
@@ -113,6 +138,7 @@ signals:
      */
     void stateChanged(const QString& newState); // Clear state
     void stateTextChanged(const QString& newStateText);
+    void manualOverrideChanged(const bool manualOverride);
     void settingsChanged(const QMLable_skypuff_config & cfg);
     void statusChanged(const QString &newStatus, bool isWarning = false);
     void brakingExtensionRangeChanged(const bool isBrakingExtensionRange);
@@ -176,6 +202,8 @@ protected:
     skypuff_state state;
     QString stateText;
     QString status;
+
+    bool m_manualOverride = false;
 
     // Getters
     bool isBrakingRange() const {return abs(curTac) <= cfg.braking_length;}

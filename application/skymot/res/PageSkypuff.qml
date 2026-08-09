@@ -15,7 +15,46 @@ import SkyPuff.vesc.winch 1.0
 Page {
     id: page
     property ConfigParams cfg: VescIf.appConfig()
+
+    // ===== Fast Rewind (auto rewind override) state =====
     property bool fastCurrentMode: false  // красная кнопка: true = держим ток 150А (перегрузка)
+    property bool frwRunning: false      // авто-таймер активен
+    property bool frwSlowPhase: false    // медленная фаза (последние метры)
+    property bool frwStopped: false      // стоп до следующего цикла REWINDING (зацеп/кнопка Стоп)
+    property bool frwCurrentMode: false  // true = держим ток (перегрузка)
+    property int frwErpmNow: 0           // текущий задаваемый ERPM (плавно меняется)
+    property int frwRampStart: 0         // ERPM в начале лестницы
+    property int frwRampTarget: 0        // целевой ERPM лестницы
+    property int frwRampTick: 10         // текущий тик лестницы (10 = готово)
+    property int frwRampTicksTotal: 10   // тиков на лестницу (Ramp time)
+    property real frwLastPos: 0          // последняя позиция (детект зацепа)
+    property int frwStallTicks: 0        // тики без движения
+
+    // Плавная смена целевого ERPM: линейная лестница от текущего к новому
+    function frwSetTarget(t) {
+        if (t === frwRampTarget && frwRampTick < frwRampTicksTotal) return
+        frwRampStart = frwErpmNow
+        frwRampTarget = t
+        frwRampTick = 0
+        frwRampTicksTotal = Math.max(3, Math.round(Skypuff.rewindRamp() * 10))
+    }
+
+    // ===== Плавный разгон/торможение ручных кнопок FAST/SLOW =====
+    // Те же настройки с экрана настроек: fast_erpm/slow_erpm + Ramp time (rewind_ramp)
+    property int btnErpmNow: 0          // текущий задаваемый ERPM
+    property int btnRampStart: 0        // ERPM в начале лестницы
+    property int btnRampTarget: 0       // целевой ERPM
+    property int btnRampTick: 10        // текущий тик (10 = готово)
+    property int btnRampTicksTotal: 10  // тиков на лестницу (Ramp time)
+    property bool btnRamping: false     // лестница активна (разгон или торможение)
+
+    function btnSetTarget(t) {
+        btnRampStart = btnErpmNow
+        btnRampTarget = t
+        btnRampTick = 0
+        btnRampTicksTotal = Math.max(3, Math.round(Skypuff.rewindRamp() * 10))
+        btnRamping = true
+    }
 
     // скорость троса (м/с) → ERPM мотора
     function msToErpm(ms) {
@@ -124,7 +163,18 @@ Page {
                     borderColor: Qt.darker(page.bgYellowColor, 1.2)
                 }
 
-                onClicked: {Skypuff.sendTerminal("set MANUAL_BRAKING")}
+                onClicked: {
+                    // В режиме смотки: аварийный стоп — глушим Fast Rewind,
+                    // мгновенно снимаем ток, затем штатный переход в удержание
+                    if (["REWINDING", "SLOWING", "SLOW"].indexOf(Skypuff.state) !== -1) {
+                        frwStopped = true
+                        frwRunning = false
+                        frwCurrentMode = false
+                        frwErpmNow = 0
+                        VescIf.commands().setCurrent(0)
+                    }
+                    Skypuff.sendTerminal("set MANUAL_BRAKING")
+                }
             }
         }
 
@@ -265,6 +315,21 @@ Page {
 
                 }
             }
+
+            // Индикатор Fast Rewind: серый — неактивен, красный — ускоренная смотка работает.
+            // В центре круга прибора, между шкалами кг и ватт. Размер — вдвое меньше кнопки SLOW.
+            Rectangle {
+                id: frwIndicator
+                width: 50
+                height: 50
+                radius: 25
+                z: 10
+                color: frwRunning ? "#D32F2F" : "#9E9E9E"
+                border.color: "white"
+                border.width: 2
+                anchors.centerIn: parent
+                Behavior on color { ColorAnimation { duration: 200 } }
+            }
         }
 
         RowLayout {
@@ -286,8 +351,8 @@ Page {
                 enabled: ["DISCONNECTED", "UNINITIALIZED", "MANUAL_BRAKING", "MANUAL_SLOW",
                           "MANUAL_SLOW_SPEED_UP", "MANUAL_SLOW_BACK",
                           "MANUAL_SLOW_BACK_SPEED_UP", "UNWINDING", "REWINDING"].indexOf(Skypuff.state) !== -1
-                onPressed:  { fastCurrentMode = false; VescIf.commands().setRpm(Skypuff.fastErpm()) }
-                onReleased: { fastCurrentMode = false; VescIf.commands().setCurrent(0) }
+                onPressed:  { fastCurrentMode = false; Skypuff.setManualOverride(true); btnSetTarget(Skypuff.fastErpm()) }
+                onReleased: { fastCurrentMode = false; btnSetTarget(0) }
             }
 
             Item {
@@ -333,24 +398,39 @@ Page {
                 enabled: ["DISCONNECTED", "UNINITIALIZED", "MANUAL_BRAKING", "MANUAL_SLOW",
                           "MANUAL_SLOW_SPEED_UP", "MANUAL_SLOW_BACK",
                           "MANUAL_SLOW_BACK_SPEED_UP", "UNWINDING", "REWINDING"].indexOf(Skypuff.state) !== -1
-                onPressed:  VescIf.commands().setRpm(Skypuff.slowErpm())
-                onReleased: VescIf.commands().setCurrent(0)
+                onPressed:  { Skypuff.setManualOverride(true); btnSetTarget(Skypuff.slowErpm()) }
+                onReleased: { btnSetTarget(0) }
             }
         }
 
-        // Повтор команд каждые 100 мс пока кнопка нажата:
-        // 1) держит ток/скорость, 2) сбрасывает штатный таймаут VESC
-        // (при потере BLE мотор сам остановится через App Settings → Timeout)
+        // Повтор команд каждые 100 мс пока кнопка нажата или идёт лестница:
+        // 1) плавный разгон/торможение (ERPM-лестница за Ramp time),
+        // 2) держит ток/скорость, 3) сбрасывает штатный таймаут VESC
         Timer {
             id: tRedRepeat
             interval: 100
             repeat: true
-            running: rTestCurrent.pressed
+            running: rTestCurrent.pressed || btnRamping
             onTriggered: {
+                // Перегрузка: удержание тока (лестница заморожена)
                 if (fastCurrentMode) {
                     VescIf.commands().setCurrent(150)
+                    return
+                }
+                // Шаг лестницы
+                if (btnRampTick < btnRampTicksTotal) {
+                    btnRampTick++
+                    btnErpmNow = Math.round(btnRampStart +
+                                            (btnRampTarget - btnRampStart) * btnRampTick / btnRampTicksTotal)
                 } else {
-                    VescIf.commands().setRpm(Skypuff.fastErpm())
+                    btnErpmNow = btnRampTarget
+                    btnRamping = false
+                }
+                VescIf.commands().setRpm(btnErpmNow)
+                // Торможение завершено после отпускания — полный стоп, ручной режим снят
+                if (!rTestCurrent.pressed && !btnRamping) {
+                    Skypuff.setManualOverride(false)
+                    VescIf.commands().setCurrent(0)
                 }
             }
         }
@@ -359,11 +439,27 @@ Page {
             id: tGreenRepeat
             interval: 100
             repeat: true
-            running: rTestSpeed.pressed
-            onTriggered: VescIf.commands().setRpm(Skypuff.slowErpm())
+            running: rTestSpeed.pressed || btnRamping
+            onTriggered: {
+                // Шаг лестницы
+                if (btnRampTick < btnRampTicksTotal) {
+                    btnRampTick++
+                    btnErpmNow = Math.round(btnRampStart +
+                                            (btnRampTarget - btnRampStart) * btnRampTick / btnRampTicksTotal)
+                } else {
+                    btnErpmNow = btnRampTarget
+                    btnRamping = false
+                }
+                VescIf.commands().setRpm(btnErpmNow)
+                // Торможение завершено после отпускания — полный стоп, ручной режим снят
+                if (!rTestSpeed.pressed && !btnRamping) {
+                    Skypuff.setManualOverride(false)
+                    VescIf.commands().setCurrent(0)
+                }
+            }
         }
 
-        // Защита зелёной кнопки: ток > 150А → стоп
+        // Защита зелёной кнопки: ток > 150А → плавный стоп (лестница вниз)
         Connections {
             target: Skypuff
             onMotorKgChanged: {
@@ -371,15 +467,15 @@ Page {
                     var amps = Skypuff.motorKg * cfg.amps_per_kg;
                     if (amps > 150) {
                         rTestSpeed.pressed = false;
-                        VescIf.commands().setCurrent(0);
+                        btnSetTarget(0);
                     }
                 }
             }
         }
 
-        // Красная кнопка: скорость Skypuff.fastErpm() ERPM, при токе >150А переключаемся на удержание 150А,
+        // Красная кнопка: скорость fastErpm (плавный разгон), при токе >150А переключаемся на удержание 150А,
         // при спаде тока <140А (гистерезис) возвращаемся в скоростной режим,
-        // при разгоне выше Skypuff.fastErpm() ERPM в режиме тока — снижаем ток (возврат в RPM)
+        // при разгоне выше fastErpm в режиме тока — снижаем ток (возврат в RPM)
         Connections {
             target: Skypuff
             onMotorKgChanged: {
@@ -390,7 +486,7 @@ Page {
                         VescIf.commands().setCurrent(150);
                     } else if (amps < 140 && fastCurrentMode) {
                         fastCurrentMode = false;
-                        VescIf.commands().setRpm(Skypuff.fastErpm());
+                        VescIf.commands().setRpm(btnErpmNow);
                     }
                 }
             }
@@ -398,8 +494,127 @@ Page {
                 if (rTestCurrent.pressed && fastCurrentMode) {
                     if (msToErpm(Skypuff.speedMs) > Skypuff.fastErpm()) {
                         fastCurrentMode = false;
-                        VescIf.commands().setRpm(Skypuff.fastErpm());  // VESC снизит ток, удерживая заданные ERPM
+                        VescIf.commands().setRpm(btnErpmNow);  // VESC снизит ток, удерживая заданные ERPM
                     }
+                }
+            }
+        }
+
+        // ===== Fast Rewind: авто-смотка с обходом штатного алгоритма =====
+        // Пока BLE на связи и state в {REWINDING, SLOWING, SLOW} — шлём свои команды
+        // (скорость + ток), как ручная кнопка FAST. При потере связи команды не
+        // уходят, контроллер сам возвращается к штатной медленной смотке.
+        Timer {
+            id: tFastRewind
+            interval: 100
+            repeat: true
+            running: Skypuff.fastRewind() && !Skypuff.manualOverride && !frwStopped
+            onTriggered: {
+                // Активные состояния: FSM покидает REWINDING на -(braking+slowing) ≈ -85 м,
+                // поэтому перекрываем и SLOWING/SLOW, пока не дойдём до медленной зоны
+                var active = ["REWINDING", "SLOWING", "SLOW"].indexOf(Skypuff.state) !== -1
+                if (!active) {
+                    if (frwRunning) {
+                        frwRunning = false
+                        frwCurrentMode = false
+                        frwErpmNow = 0
+                        VescIf.commands().setCurrent(0)
+                    }
+                    return
+                }
+
+                frwRunning = true
+
+                var pos = Skypuff.pos
+                var zone = Skypuff.rewindSlowZone()
+                var amps = Skypuff.motorKg * cfg.amps_per_kg
+
+                // Полностью смотано — стоп, прошивка сама завершит
+                if (pos >= 0) {
+                    frwRunning = false
+                    frwCurrentMode = false
+                    frwErpmNow = 0
+                    VescIf.commands().setCurrent(0)
+                    return
+                }
+
+                var wantSlow = pos >= -zone
+
+                // === Защита от зацепа (двухступенчатая) ===
+                if (Math.abs(pos - frwLastPos) < 0.05) {
+                    frwStallTicks++
+                    if (frwSlowPhase && frwStallTicks > 50) {
+                        // Медленная фаза: 5 сек без движения → полный стоп
+                        frwStopped = true
+                        frwRunning = false
+                        frwCurrentMode = false
+                        frwErpmNow = 0
+                        VescIf.commands().setCurrent(0)
+                        Skypuff.setStatus(qsTr("Rope stuck — rewind stopped!"), true)
+                        return
+                    }
+                    if (!frwSlowPhase && frwStallTicks > 20) {
+                        // Быстрая фаза: 2 сек без движения → попытка медленной
+                        frwSlowPhase = true
+                        frwSetTarget(Skypuff.rewindSlowErpm())
+                    }
+                } else {
+                    frwStallTicks = 0
+                }
+                frwLastPos = pos
+
+                // Переход в медленную фазу (последние метры) — плавное торможение
+                if (wantSlow && !frwSlowPhase) {
+                    frwSlowPhase = true
+                    frwSetTarget(Skypuff.rewindSlowErpm())
+                }
+                // Выход из медленной зоны (трос снова далеко)
+                if (!wantSlow && frwSlowPhase) {
+                    frwSlowPhase = false
+                    frwSetTarget(Skypuff.rewindErpm())
+                }
+
+                // Первый запуск — задаём быструю цель
+                if (frwErpmNow === 0 && !frwSlowPhase) {
+                    frwSetTarget(Skypuff.rewindErpm())
+                }
+
+                // Шаг ERPM-лестницы (линейная интерполяция за Ramp time)
+                if (frwRampTick < frwRampTicksTotal) {
+                    frwRampTick++
+                    frwErpmNow = Math.round(frwRampStart +
+                                            (frwRampTarget - frwRampStart) * frwRampTick / frwRampTicksTotal)
+                } else {
+                    frwErpmNow = frwRampTarget
+                }
+
+                var maxCurrent = frwSlowPhase ? Skypuff.rewindSlowMaxCurrent()
+                                              : Skypuff.rewindMaxCurrent()
+                var hyster = Math.max(5, Math.round(maxCurrent * 0.1))
+
+                // Перегрузка → удержание тока; спад (гистерезис) → назад в RPM
+                if (amps > maxCurrent && !frwCurrentMode) {
+                    frwCurrentMode = true
+                    VescIf.commands().setCurrent(maxCurrent)
+                } else if (amps < maxCurrent - hyster && frwCurrentMode) {
+                    frwCurrentMode = false
+                    VescIf.commands().setRpm(frwErpmNow)
+                } else if (!frwCurrentMode) {
+                    VescIf.commands().setRpm(frwErpmNow)
+                }
+            }
+        }
+
+        // Новый цикл смотки — снимаем блокировку (после зацепа/Стоп)
+        Connections {
+            target: Skypuff
+            onStateChanged: {
+                if (Skypuff.state === "REWINDING") {
+                    frwStopped = false
+                    frwSlowPhase = false
+                    frwStallTicks = 0
+                    frwErpmNow = 0
+                    frwRampTick = frwRampTicksTotal
                 }
             }
         }
@@ -567,6 +782,7 @@ Page {
                 break
             case "REWINDING":
             case "UNWINDING":
+                bStop.enabled = true
                 bUnwinding.enabled = true
                 bUnwinding.state = "UNWINDING"
                 break
@@ -581,6 +797,7 @@ Page {
                 break
             case "SLOW":
             case "SLOWING":
+                bStop.enabled = true
                 bPrePull.enabled = true
                 break
             case "FAST_PULL":
