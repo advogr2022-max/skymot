@@ -21,14 +21,17 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QSettings>
+#include <QDateTime>
 #include "skypuff.h"
 #include "utility.h"
+#include "logwriter.h"
 
 Skypuff::Skypuff(VescInterface *v) : QObject(),
     vesc(v),
     aliveTimerId(0),
     aliveTimeoutTimerId(0),
-    getConfTimeoutTimerId(0)
+    getConfTimeoutTimerId(0),
+    smotLogTimerId(0)
 {
     vesc->setReconnectLastCan(true);
     vesc->setScanCanOnConnect(true);
@@ -41,6 +44,9 @@ Skypuff::Skypuff(VescInterface *v) : QObject(),
     connect(vesc, SIGNAL(fwRxChanged(bool, bool)), this, SLOT(firmwareVersionReceived(bool, bool)));
     connect(vesc, SIGNAL(messageDialog(QString,QString,bool,bool)), this, SLOT(logVescDialog(const QString&,const QString&)));
     connect(vesc->commands(), SIGNAL(customAppDataReceived(QByteArray)), this, SLOT(customAppDataReceived(QByteArray)));
+
+    // Per-second rewind session logger (REWINDING/SLOWING/SLOW states)
+    smotLogTimerId = startTimer(1000);
 
     setState(DISCONNECTED);
     clearStats();
@@ -209,6 +215,12 @@ void Skypuff::setRewindRamp(double v)
 void Skypuff::setState(const skypuff_state newState)
 {
     if(state != newState) {
+        // Rewind session log markers
+        if (newState == REWINDING) {
+            logSmot(QStringLiteral("=== REWINDING START ==="));
+        } else if (state == REWINDING) {
+            logSmot(QStringLiteral("=== REWINDING END -> %1").arg(state_str(newState)));
+        }
         state = newState;
         emit stateChanged(state_str(state));
 
@@ -385,6 +397,18 @@ void Skypuff::timerEvent(QTimerEvent *event)
     }
     else if(event->timerId() == this->aliveTimerId) {
         requestStats();
+    }
+    else if(event->timerId() == smotLogTimerId) {
+        // Per-second rewind session record: state, rope length to zero, current, erpm
+        if (state == REWINDING || state == SLOWING || state == SLOW) {
+            const QString line = QDateTime::currentDateTime().toString("HH:mm:ss") + " " +
+                    state_str(state) +
+                    QString(" pos=%1м I=%2А erpm=%3")
+                        .arg(cfg.tac_steps_to_meters(-curTac), 0, 'f', 1)
+                        .arg(motorAmps, 0, 'f', 1)
+                        .arg(erpm, 0, 'f', 0);
+            logSmot(line);
+        }
     }
     else
         qFatal("Skypuff::timerEvent(): unknown timer id %d", event->timerId());

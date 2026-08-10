@@ -221,7 +221,8 @@ HEADERS += \
     missing_types.h \
     skypuff.h \
     app_skypuff.h \
-    qmlable_skypuff_types.h
+    qmlable_skypuff_types.h \
+    logwriter.h
     
 contains(DEFINES, HAS_BLUETOOTH) {
     SOURCES += ../../bleuart.cpp

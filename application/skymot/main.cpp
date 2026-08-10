@@ -17,9 +17,142 @@
 
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
+#include <QFile>
+#include <QTextStream>
+#include <QDateTime>
+#include <QMutex>
+#include <QStandardPaths>
+#include <QElapsedTimer>
+#include <QTimer>
+#include <QDir>
+#include <QFileInfo>
+#include <android/log.h>
+#include <QtAndroidExtras/QtAndroid>
+#include <QtAndroidExtras/QAndroidJniObject>
 #include "vescinterface.h"
 #include "skypuff.h"
 #include "utility.h"
+
+// ===== File logs: Download/Skymot/<yyyyMMdd_HHmm>.log (general) and
+// Download/Skymot/<yyyyMMdd_HHmm>smot.log (rewind session) =====
+// Scoped Storage (targetSdk 34) forbids direct writes to /sdcard/Download,
+// so we try Download first, then Android/data, then internal files dir.
+#include "logwriter.h"
+
+static QMutex g_logMutex;
+static QStringList g_pendingLog;   // buffer until channels are ready
+static QElapsedTimer g_startTimer;
+static bool g_startTimerInit = false;
+static bool g_initAttempted = false;
+
+static QFile g_fileGeneral;   // Download/Skymot (or fallback)
+static QFile g_fileSmot;
+
+// Try to open a log file. Preferred: Download/Skymot (user-visible).
+// Fallback 1: Android/data/skymot.winch/files (visible via USB/MTP).
+// Fallback 2: internal files dir (always works).
+static QFile *openLogFile(QFile &f, const QString &name)
+{
+    const QStringList candidates = {
+        QStringLiteral("/sdcard/Download/Skymot/") + name,
+        QStringLiteral("/storage/emulated/0/Android/data/skymot.winch/files/") + name,
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/") + name
+    };
+    for (const QString &path : candidates) {
+        QDir().mkpath(QFileInfo(path).absolutePath());
+        f.setFileName(path);
+        if (f.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+            __android_log_print(ANDROID_LOG_INFO, "SkymotLog", "log '%s' -> %s",
+                                qPrintable(name), qPrintable(path));
+            return &f;
+        }
+    }
+    return nullptr;
+}
+
+static void initLogFile()
+{
+    __android_log_print(ANDROID_LOG_INFO, "SkymotLog", "initLogFile called");
+    QString base = QDateTime::currentDateTime().toString("yyyyMMdd_HHmm");
+    openLogFile(g_fileGeneral, base + ".log");
+    openLogFile(g_fileSmot, base + "smot.log");
+
+    QMutexLocker locker(&g_logMutex);
+    QStringList pending = g_pendingLog;
+    g_pendingLog.clear();
+    for (const QString &line : pending) {
+        QByteArray data = (line + "\n").toUtf8();
+        if (g_fileGeneral.isOpen()) {
+            g_fileGeneral.write(data);
+            g_fileGeneral.flush();
+        }
+    }
+}
+
+void logGeneral(const QString &line)
+{
+    QMutexLocker locker(&g_logMutex);
+    QByteArray data = (line + "\n").toUtf8();
+    if (g_fileGeneral.isOpen()) {
+        g_fileGeneral.write(data);
+        g_fileGeneral.flush();
+    } else {
+        g_pendingLog.append(line);
+    }
+}
+
+void logSmot(const QString &line)
+{
+    QMutexLocker locker(&g_logMutex);
+    QByteArray data = (line + "\n").toUtf8();
+    if (g_fileSmot.isOpen()) {
+        g_fileSmot.write(data);
+        g_fileSmot.flush();
+    }
+    // smot lines also go to the general log (single source of truth)
+    if (g_fileGeneral.isOpen()) {
+        g_fileGeneral.write(data);
+        g_fileGeneral.flush();
+    } else {
+        g_pendingLog.append(line);
+    }
+}
+
+void logMessageHandler(QtMsgType type, const QMessageLogContext &ctx, const QString &msg)
+{
+    (void)ctx;
+
+    if (!g_startTimerInit) {
+        g_startTimer.start();
+        g_startTimerInit = true;
+    }
+
+    QString line = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz") + " ";
+    switch (type) {
+    case QtDebugMsg:    line += "D"; break;
+    case QtInfoMsg:     line += "I"; break;
+    case QtWarningMsg:  line += "W"; break;
+    case QtCriticalMsg: line += "C"; break;
+    case QtFatalMsg:    line += "F"; break;
+    }
+    line += " " + msg;
+
+    // Delayed init (JNI-safe after grace period). Called WITHOUT holding the
+    // mutex: JNI may emit qWarning which re-enters this handler.
+    bool needInit = false;
+    {
+        QMutexLocker locker(&g_logMutex);
+        if (!g_fileGeneral.isOpen() && !g_initAttempted
+                && g_startTimer.elapsed() > 3000) {
+            g_initAttempted = true;
+            needInit = true;
+        }
+    }
+    if (needInit) {
+        initLogFile();
+    }
+    logGeneral(line);
+}
 
 static VescInterface * vesc = NULL;
 static Skypuff * skypuff = NULL;
@@ -74,6 +207,13 @@ int main(int argc, char *argv[])
 
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
     QGuiApplication app(argc, argv);
+
+    // File logs to Download/Skymot (see logwriter.h). Init after startup grace
+    // period: JNI (MediaStore) is only safe once QtActivity is fully up.
+    // Both triggers used: QTimer (primary) and first log message after 3 s (backup).
+    qInstallMessageHandler(logMessageHandler);
+    qDebug() << "=== Skymot starting ===";
+    QTimer::singleShot(3000, &app, initLogFile);
 
     QQmlApplicationEngine engine;
 

@@ -177,6 +177,7 @@ protected:
     int aliveTimerId;
     int aliveTimeoutTimerId;
     int getConfTimeoutTimerId;
+    int smotLogTimerId;
 
     // Alive responce stats to monitor channel quality
     QElapsedTimer aliveResponseDelay;
