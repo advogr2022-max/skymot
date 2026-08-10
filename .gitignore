@@ -50,3 +50,6 @@ build_android_signed
 
 res/firmwares/*/
 /build
+
+# APK builds
+*.apk
