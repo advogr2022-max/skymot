@@ -62,6 +62,10 @@ static QFile *openLogFile(QFile &f, const QString &name)
         QDir().mkpath(QFileInfo(path).absolutePath());
         f.setFileName(path);
         if (f.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+            // 666: file managers (different UID) must see/read the logs
+            f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner |
+                             QFileDevice::ReadGroup | QFileDevice::WriteGroup |
+                             QFileDevice::ReadOther | QFileDevice::WriteOther);
             __android_log_print(ANDROID_LOG_INFO, "SkymotLog", "log '%s' -> %s",
                                 qPrintable(name), qPrintable(path));
             return &f;
@@ -70,12 +74,69 @@ static QFile *openLogFile(QFile &f, const QString &name)
     return nullptr;
 }
 
+// Register a written log file in MediaStore so that file managers
+// (Files app, etc.) can see it on Android 11+ (Scoped Storage).
+// Pure file-system writes are invisible to file managers otherwise.
+static void scanFileInMediaStore(const QString &path)
+{
+    QAndroidJniEnvironment env;
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+    }
+
+    QAndroidJniObject context = QtAndroid::androidContext();
+    if (!context.isValid()) {
+        return;
+    }
+
+    jclass stringClass = env->FindClass("java/lang/String");
+    if (!stringClass) {
+        env->ExceptionClear();
+        return;
+    }
+    jobjectArray paths = env->NewObjectArray(1, stringClass, nullptr);
+    if (!paths) {
+        env->ExceptionClear();
+        return;
+    }
+    jstring jpath = env->NewStringUTF(path.toUtf8().constData());
+    if (jpath) {
+        env->SetObjectArrayElement(paths, 0, jpath);
+        env->DeleteLocalRef(jpath);
+    }
+
+    // MediaScannerConnection.scanFile(Context, String[], String[], OnScanCompletedListener)
+    jclass mscClass = env->FindClass("android/media/MediaScannerConnection");
+    if (mscClass) {
+        jmethodID scanMethod = env->GetStaticMethodID(mscClass, "scanFile",
+            "(Landroid/content/Context;[Ljava/lang/String;[Ljava/lang/String;Landroid/media/MediaScannerConnection$OnScanCompletedListener;)V");
+        if (scanMethod) {
+            env->CallStaticVoidMethod(mscClass, scanMethod,
+                                      context.object(), paths, nullptr, nullptr);
+            __android_log_print(ANDROID_LOG_INFO, "SkymotLog", "MediaStore scan: %s",
+                                qPrintable(path));
+        }
+    }
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+    }
+    env->DeleteLocalRef(paths);
+}
+
 static void initLogFile()
 {
     __android_log_print(ANDROID_LOG_INFO, "SkymotLog", "initLogFile called");
     QString base = QDateTime::currentDateTime().toString("yyyyMMdd_HHmm");
     openLogFile(g_fileGeneral, base + ".log");
     openLogFile(g_fileSmot, base + "smot.log");
+
+    // Make the log files visible to file managers (MediaStore on Android 11+)
+    if (g_fileGeneral.isOpen()) {
+        scanFileInMediaStore(g_fileGeneral.fileName());
+    }
+    if (g_fileSmot.isOpen()) {
+        scanFileInMediaStore(g_fileSmot.fileName());
+    }
 
     QMutexLocker locker(&g_logMutex);
     QStringList pending = g_pendingLog;
