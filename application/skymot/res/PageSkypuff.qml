@@ -29,6 +29,7 @@ Page {
     property int frwRampTicksTotal: 10   // тиков на лестницу (Ramp time)
     property real frwLastPos: 0          // последняя позиция (детект зацепа)
     property int frwStallTicks: 0        // тики без движения
+    property bool frwArmed: false       // вооружение Fast Rewind через 10 с после BLE-коннекта
 
     // Плавная смена целевого ERPM: линейная лестница от текущего к новому
     function frwSetTarget(t) {
@@ -506,7 +507,8 @@ Page {
         // уходят, контроллер сам возвращается к штатной медленной смотке.
         // Таймер вооружается только через 10 сек после подключения к контроллеру
         // (frwArmed) — чтобы не вмешиваться в обмен конфигом сразу после коннекта.
-        property bool frwArmed: false
+        // NB: свойство frwArmed объявлено на корне Page (см. блок frw* выше) —
+        // объявления внутри ColumnLayout не видны дочерним binding'ам (ReferenceError).
 
         Connections {
             target: VescIf
