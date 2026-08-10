@@ -104,6 +104,22 @@ public:
     Q_INVOKABLE int slowErpm();
     Q_INVOKABLE void setSlowErpm(int v);
 
+    // Fast Rewind settings. Stored on the phone (QSettings), NOT sent to the VESC.
+    Q_INVOKABLE bool fastRewind();
+    Q_INVOKABLE void setFastRewind(bool v);
+    Q_INVOKABLE int rewindErpm();
+    Q_INVOKABLE void setRewindErpm(int v);
+    Q_INVOKABLE int rewindMaxCurrent();
+    Q_INVOKABLE void setRewindMaxCurrent(int v);
+    Q_INVOKABLE int rewindSlowErpm();
+    Q_INVOKABLE void setRewindSlowErpm(int v);
+    Q_INVOKABLE int rewindSlowMaxCurrent();
+    Q_INVOKABLE void setRewindSlowMaxCurrent(int v);
+    Q_INVOKABLE int rewindSlowZone();
+    Q_INVOKABLE void setRewindSlowZone(int v);
+    Q_INVOKABLE double rewindRamp();
+    Q_INVOKABLE void setRewindRamp(double v);
+
 signals:
     /* It is simple to work with QML text states:
      *

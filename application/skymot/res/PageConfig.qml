@@ -734,6 +734,139 @@ Page {
                     }
                 }
                 GroupBox {
+                    title: qsTr("Fast rewind")
+                    Layout.fillWidth: true
+                    Layout.margins: 10
+
+                    ColumnLayout {
+                        anchors.fill: parent
+
+                        RowLayout {
+                            Text {
+                                text: qsTr('Fast rewind (<a href="help">?</a>)')
+                                onLinkActivated: VescIf.emitMessageDialog(qsTr("Fast rewind"),
+                                                                         qsTr("While connected, override the stock slow REWINDING with a fast motor-speed rewind. If BLE is lost, the controller falls back to its stock autonomous rewind. Stored on the phone, not sent to the VESC."),
+                                                                         false, false);
+                            }
+                            Item {Layout.fillWidth: true}
+                            Switch {
+                                id: fastRewindSwitch
+                                checked: Skypuff.fastRewind()
+                                onCheckedChanged: Skypuff.setFastRewind(checked)
+                            }
+                        }
+                        RowLayout {
+                            Text {
+                                text: qsTr('Rewind speed (ERPM) (<a href="help">?</a>)')
+                                onLinkActivated: VescIf.emitMessageDialog(qsTr("Rewind speed"),
+                                                                         qsTr("Motor ERPM for the fast rewind phase (until the slow zone). Stored on the phone, not sent to the VESC."),
+                                                                         false, false);
+                            }
+                            Item {Layout.fillWidth: true}
+                            SpinBox {
+                                id: rewindErpm
+                                editable: true
+                                from: 1000
+                                to: 50000
+                                stepSize: 500
+                                value: Skypuff.rewindErpm()
+                                onValueModified: Skypuff.setRewindErpm(value)
+                            }
+                        }
+                        RowLayout {
+                            Text {
+                                text: qsTr('Rewind max current (A) (<a href="help">?</a>)')
+                                onLinkActivated: VescIf.emitMessageDialog(qsTr("Rewind max current"),
+                                                                         qsTr("Current limit for the fast rewind phase (overload protection). Stored on the phone, not sent to the VESC."),
+                                                                         false, false);
+                            }
+                            Item {Layout.fillWidth: true}
+                            SpinBox {
+                                id: rewindMaxCurrent
+                                editable: true
+                                from: 20
+                                to: 170
+                                stepSize: 5
+                                value: Skypuff.rewindMaxCurrent()
+                                onValueModified: Skypuff.setRewindMaxCurrent(value)
+                            }
+                        }
+                        RowLayout {
+                            Text {
+                                text: qsTr('Rewind slow speed (ERPM) (<a href="help">?</a>)')
+                                onLinkActivated: VescIf.emitMessageDialog(qsTr("Rewind slow speed"),
+                                                                         qsTr("Motor ERPM for the slow rewind phase (last meters before zero). Stored on the phone, not sent to the VESC."),
+                                                                         false, false);
+                            }
+                            Item {Layout.fillWidth: true}
+                            SpinBox {
+                                id: rewindSlowErpm
+                                editable: true
+                                from: 100
+                                to: 3000
+                                stepSize: 100
+                                value: Skypuff.rewindSlowErpm()
+                                onValueModified: Skypuff.setRewindSlowErpm(value)
+                            }
+                        }
+                        RowLayout {
+                            Text {
+                                text: qsTr('Rewind slow max current (A) (<a href="help">?</a>)')
+                                onLinkActivated: VescIf.emitMessageDialog(qsTr("Rewind slow max current"),
+                                                                         qsTr("Current limit for the slow rewind phase. Stored on the phone, not sent to the VESC."),
+                                                                         false, false);
+                            }
+                            Item {Layout.fillWidth: true}
+                            SpinBox {
+                                id: rewindSlowMaxCurrent
+                                editable: true
+                                from: 5
+                                to: 50
+                                stepSize: 1
+                                value: Skypuff.rewindSlowMaxCurrent()
+                                onValueModified: Skypuff.setRewindSlowMaxCurrent(value)
+                            }
+                        }
+                        RowLayout {
+                            Text {
+                                text: qsTr('Rewind slow zone (meters) (<a href="help">?</a>)')
+                                onLinkActivated: VescIf.emitMessageDialog(qsTr("Rewind slow zone"),
+                                                                         qsTr("Last meters before the rope is fully rewound, where the slow rewind phase is active. Stored on the phone, not sent to the VESC."),
+                                                                         false, false);
+                            }
+                            Item {Layout.fillWidth: true}
+                            SpinBox {
+                                id: rewindSlowZone
+                                editable: true
+                                from: 1
+                                to: 100
+                                stepSize: 1
+                                value: Skypuff.rewindSlowZone()
+                                onValueModified: Skypuff.setRewindSlowZone(value)
+                            }
+                        }
+                        RowLayout {
+                            Text {
+                                text: qsTr('Ramp time (secs) (<a href="help">?</a>)')
+                                onLinkActivated: VescIf.emitMessageDialog(qsTr("Ramp time"),
+                                                                         qsTr("Ramp up/down time for the ERPM staircase (10 steps). Stored on the phone, not sent to the VESC."),
+                                                                         false, false);
+                            }
+                            Item {Layout.fillWidth: true}
+                            RealSpinBox {
+                                id: rewindRamp
+                                from: 0.5
+                                to: 3.0
+                                decimals: 1
+                                stepSize: 0.1
+                                value: Skypuff.rewindRamp()
+                                onValueModified: Skypuff.setRewindRamp(value)
+                            }
+                        }
+                    }
+                }
+
+                GroupBox {
                     title: qsTr("Test buttons (ERPM)")
                     Layout.fillWidth: true
                     Layout.margins: 10

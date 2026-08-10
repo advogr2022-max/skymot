@@ -211,7 +211,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     qRegisterMetaType<QtMsgType>("QtMsgType");
 
-    mVersion = QString::number(VT_VERSION, 'f', 2);
+    mVersion = QString::fromUtf8(VT_VERSION);
     mVesc = new VescInterface(this);
     mPreferences = new Preferences(this);
     mPreferences->setVesc(mVesc);

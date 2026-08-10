@@ -170,7 +170,7 @@ bool Utility::autoconnectBlockingWithProgress(VescInterface *vesc, QWidget *pare
 
 void Utility::checkVersion(VescInterface *vesc)
 {
-    QString version = QString::number(VT_VERSION);
+    QString version = QString::fromUtf8(VT_VERSION);
     QUrl url("https://vesc-project.com/vesctool-version.html");
     QNetworkAccessManager manager;
     QNetworkRequest request(url);
@@ -249,7 +249,7 @@ QString Utility::aboutText()
               "&copy; Benjamin Vedder 2016 - 2024<br>"
               "<a href=\"mailto:benjamin@vedder.se\">benjamin@vedder.se</a><br>"
               "<a href=\"https://vesc-project.com/\">https://vesc-project.com/</a>")
-            .arg(QString::number(VT_VERSION, 'f', 2))
+            .arg(QString::fromUtf8(VT_VERSION))
         #if VT_IS_TEST_VERSION
             .arg(QString::number(VT_IS_TEST_VERSION))
         #endif

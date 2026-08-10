@@ -57,6 +57,28 @@ Skypuff::Skypuff(VescInterface *v) : QObject(),
         if (!s.contains("skypuff/slow_erpm")) {
             s.setValue("skypuff/slow_erpm", 3000);
         }
+        // First launch: seed Fast Rewind defaults (stored on the phone).
+        if (!s.contains("skypuff/fast_rewind")) {
+            s.setValue("skypuff/fast_rewind", true);
+        }
+        if (!s.contains("skypuff/rewind_erpm")) {
+            s.setValue("skypuff/rewind_erpm", 20000);
+        }
+        if (!s.contains("skypuff/rewind_max_current")) {
+            s.setValue("skypuff/rewind_max_current", 150);
+        }
+        if (!s.contains("skypuff/rewind_slow_erpm")) {
+            s.setValue("skypuff/rewind_slow_erpm", 2000);
+        }
+        if (!s.contains("skypuff/rewind_slow_max_current")) {
+            s.setValue("skypuff/rewind_slow_max_current", 25);
+        }
+        if (!s.contains("skypuff/rewind_slow_zone")) {
+            s.setValue("skypuff/rewind_slow_zone", 25);
+        }
+        if (!s.contains("skypuff/rewind_ramp")) {
+            s.setValue("skypuff/rewind_ramp", 1.0);
+        }
     }
 }
 
@@ -91,6 +113,92 @@ void Skypuff::setSlowErpm(int v)
 {
     QSettings s;
     s.setValue("skypuff/slow_erpm", v);
+}
+
+// Fast Rewind settings. Stored on the phone only (QSettings),
+// never sent to the VESC firmware.
+bool Skypuff::fastRewind()
+{
+    QSettings s;
+    return s.value("skypuff/fast_rewind", true).toBool();
+}
+
+void Skypuff::setFastRewind(bool v)
+{
+    QSettings s;
+    s.setValue("skypuff/fast_rewind", v);
+}
+
+int Skypuff::rewindErpm()
+{
+    QSettings s;
+    return s.value("skypuff/rewind_erpm", 20000).toInt();
+}
+
+void Skypuff::setRewindErpm(int v)
+{
+    QSettings s;
+    s.setValue("skypuff/rewind_erpm", v);
+}
+
+int Skypuff::rewindMaxCurrent()
+{
+    QSettings s;
+    return s.value("skypuff/rewind_max_current", 150).toInt();
+}
+
+void Skypuff::setRewindMaxCurrent(int v)
+{
+    QSettings s;
+    s.setValue("skypuff/rewind_max_current", v);
+}
+
+int Skypuff::rewindSlowErpm()
+{
+    QSettings s;
+    return s.value("skypuff/rewind_slow_erpm", 2000).toInt();
+}
+
+void Skypuff::setRewindSlowErpm(int v)
+{
+    QSettings s;
+    s.setValue("skypuff/rewind_slow_erpm", v);
+}
+
+int Skypuff::rewindSlowMaxCurrent()
+{
+    QSettings s;
+    return s.value("skypuff/rewind_slow_max_current", 25).toInt();
+}
+
+void Skypuff::setRewindSlowMaxCurrent(int v)
+{
+    QSettings s;
+    s.setValue("skypuff/rewind_slow_max_current", v);
+}
+
+int Skypuff::rewindSlowZone()
+{
+    QSettings s;
+    return s.value("skypuff/rewind_slow_zone", 25).toInt();
+}
+
+void Skypuff::setRewindSlowZone(int v)
+{
+    QSettings s;
+    s.setValue("skypuff/rewind_slow_zone", v);
+}
+
+double Skypuff::rewindRamp()
+{
+    QSettings s;
+    return s.value("skypuff/rewind_ramp", 1.0).toDouble();
+}
+
+void Skypuff::setRewindRamp(double v)
+{
+    QSettings s;
+    s.setValue("skypuff/rewind_ramp", v);
 }
 
 void Skypuff::setState(const skypuff_state newState)
