@@ -13,6 +13,16 @@
 | Ветка | `v1.4.0` (создана от v1.1.0, запушена на GitHub, upstream настроен) |
 | Версия | 1.4.0 / code 140 — в `skypuff.pro` + `AndroidManifest.xml` (оба места) |
 | Коммит | `c2f8075` — бамп версии |
+| **Блок настроек Fast rewind** | ✅ перенесён из 1.3.x (7 настроек, QSettings) — коммит `be730d6` |
+| **Фикс чистой сборки** | ✅ `VT_VERSION` как строка в DEFINES (`\\\"1.4.0\\\"`) + `QString::fromUtf8` вместо `number()` — коммит `be730d6` |
+| **Фикс краша при старте** | ✅ добавлены недостающие пермишены manifest (ACCESS_NETWORK_STATE и др.) — без них SIGABRT в `ConnectivityManager.getAllNetworkInfo()` — коммит `be730d6` |
+| Проверка на AVD | ✅ v1.4.0 установлена, стартует без крашей, блок Fast rewind виден, QSettings-дефолты пишутся |
+
+## ⚠️ Грабли чистой сборки (открыты на 1.4.0)
+
+1. **`-DVT_VERSION=1.4.0` — невалидный float-литерал** (`1.4` + суффикс `.0`): 1.3.x собирались только потому, что `utility.o` не пересобирался (старый от 1.2.0). При чистой сборке — `error: invalid suffix '.0' on floating constant`. Фикс: `DEFINES += VT_VERSION=\\\"$$VT_VERSION\\\"` + в C++ `QString::fromUtf8(VT_VERSION)` вместо `QString::number(VT_VERSION)` (utility.cpp:173,252, boardsetupwindow.cpp:27, mainwindow.cpp:214)
+2. **Manifest из v1.1.0 не содержит дефолтных Qt-пермишенов** (ACCESS_NETWORK_STATE, INTERNET, CAMERA, RECORD_AUDIO, BLUETOOTH_ADMIN) — 1.1.0 их получала от androiddeployqt, ручная сборка — нет. Без ACCESS_NETWORK_STATE → **SIGABRT при старте** (`ConnectivityService.getAllNetworkInfo` SecurityException). Сверять с 1.3.x manifest при ручной сборке!
+3. **`~/gradle_offline.sh` захардкожен** на `~/build_skypuff` — для 1.4.0 создан `~/gradle_offline140.sh` (путь `~/build_skypuff140/android-build`)
 
 ## Что было в v1.1.0 (база)
 
