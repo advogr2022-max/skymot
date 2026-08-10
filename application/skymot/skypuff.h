@@ -87,6 +87,15 @@ class Skypuff : public QObject
 public:
     Skypuff(VescInterface *parent = 0);
 
+    // Public status posting for QML. The private setStatus() is not QML-accessible
+    // and takes no warning flag; this wrapper sets the status and emits the
+    // two-arg signal (isWarning) that the gauge listens to.
+    Q_INVOKABLE void postStatus(const QString &msg, bool warning)
+    {
+        status = msg;
+        emit statusChanged(msg, warning);
+    }
+
     Q_INVOKABLE void sendTerminal(const QString &c) {vesc->commands()->sendTerminalCmd(c);}
 
     // All this types conversion between C++ and QML is very strange...
@@ -182,6 +191,7 @@ protected:
     int aliveTimerId;
     int aliveTimeoutTimerId;
     int getConfTimeoutTimerId;
+    int smotLogTimerId;         // 1 s rewind-session logger
 
     // Alive responce stats to monitor channel quality
     QElapsedTimer aliveResponseDelay;

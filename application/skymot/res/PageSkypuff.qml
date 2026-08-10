@@ -504,11 +504,34 @@ Page {
         // Пока BLE на связи и state в {REWINDING, SLOWING, SLOW} — шлём свои команды
         // (скорость + ток), как ручная кнопка FAST. При потере связи команды не
         // уходят, контроллер сам возвращается к штатной медленной смотке.
+        // Таймер вооружается только через 10 сек после подключения к контроллеру
+        // (frwArmed) — чтобы не вмешиваться в обмен конфигом сразу после коннекта.
+        property bool frwArmed: false
+
+        Connections {
+            target: VescIf
+            onPortConnectedChanged: {
+                if (VescIf.isPortConnected()) {
+                    frwArmed = false
+                    tFrwArm.start()
+                } else {
+                    frwArmed = false
+                    tFrwArm.stop()
+                }
+            }
+        }
+
+        Timer {
+            id: tFrwArm
+            interval: 10000
+            onTriggered: frwArmed = true
+        }
+
         Timer {
             id: tFastRewind
             interval: 100
             repeat: true
-            running: Skypuff.fastRewind() && !Skypuff.manualOverride && !frwStopped
+            running: frwArmed && Skypuff.fastRewind() && !Skypuff.manualOverride && !frwStopped
             onTriggered: {
                 // Активные состояния: FSM покидает REWINDING на -(braking+slowing) ≈ -85 м,
                 // поэтому перекрываем и SLOWING/SLOW, пока не дойдём до медленной зоны
@@ -525,12 +548,14 @@ Page {
 
                 frwRunning = true
 
-                var pos = Skypuff.pos
+                // drawnMeters: вытянутые метры (положительные), при смотке
+                // уменьшаются к нулю (конец троса приближается к лебёдке)
+                var pos = Skypuff.drawnMeters
                 var zone = Skypuff.rewindSlowZone()
                 var amps = Skypuff.motorKg * cfg.amps_per_kg
 
                 // Полностью смотано — стоп, прошивка сама завершит
-                if (pos >= 0) {
+                if (pos <= 0.05) {
                     frwRunning = false
                     frwCurrentMode = false
                     frwErpmNow = 0
@@ -538,7 +563,7 @@ Page {
                     return
                 }
 
-                var wantSlow = pos >= -zone
+                var wantSlow = pos <= zone
 
                 // === Защита от зацепа (двухступенчатая) ===
                 if (Math.abs(pos - frwLastPos) < 0.05) {
@@ -550,7 +575,7 @@ Page {
                         frwCurrentMode = false
                         frwErpmNow = 0
                         VescIf.commands().setCurrent(0)
-                        Skypuff.setStatus(qsTr("Rope stuck — rewind stopped!"), true)
+                        Skypuff.postStatus(qsTr("Rope stuck — rewind stopped!"), true)
                         return
                     }
                     if (!frwSlowPhase && frwStallTicks > 20) {
