@@ -115,6 +115,11 @@ void Skypuff::setSlowErpm(int v)
     s.setValue("skypuff/slow_erpm", v);
 }
 
+QString Skypuff::version()
+{
+    return QString::fromUtf8(VT_VERSION);
+}
+
 // Fast Rewind settings. Stored on the phone only (QSettings),
 // never sent to the VESC firmware.
 bool Skypuff::fastRewind()
