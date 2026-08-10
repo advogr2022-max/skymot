@@ -297,7 +297,9 @@ Page {
             tempMotor: Skypuff.tempMotor
 
             // Statuses
-            stateText: Skypuff.stateText
+            // When the auto-rewind module is running, show its marker instead
+            // of the firmware state for visual control of the algorithm.
+            stateText: page.frwActive ? "VeryFastRewind" : Skypuff.stateText
             status: Skypuff.fault
 
             Connections {

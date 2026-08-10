@@ -1596,7 +1596,8 @@ Item {
                 anchors.top: parent.top
                 antialiasing: true
                 font.pixelSize: Math.max(10, root.diameter * 0.06)
-                color: root.state === "MANUAL_BRAKING" ? root.dangerTextColor : root.textColor;
+                color: root.state === "MANUAL_BRAKING" ? root.dangerTextColor :
+                        root.stateText === "VeryFastRewind" ? "#FF6D00" : root.textColor;
 
                 property real mDown: root.gaugeHeight * 2.8
 
