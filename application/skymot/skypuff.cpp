@@ -212,6 +212,11 @@ void Skypuff::setRewindRamp(double v)
     s.setValue("skypuff/rewind_ramp", v);
 }
 
+void Skypuff::logSmotMsg(const QString &line)
+{
+    logSmot(line);
+}
+
 void Skypuff::setState(const skypuff_state newState)
 {
     if(state != newState) {

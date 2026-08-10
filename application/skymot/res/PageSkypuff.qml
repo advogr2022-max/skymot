@@ -17,6 +17,88 @@ Page {
     property ConfigParams cfg: VescIf.appConfig()
     property bool fastCurrentMode: false  // красная кнопка: true = держим ток 150А (перегрузка)
 
+    // ===== Auto rewind module (independent of firmware, overrides it) =====
+    // Armed by REWINDING status from telemetry; sends its own setRpm/setCurrent
+    // every 50 ms (faster than firmware smooth updates) until STOP or rope=0.
+    property bool frwActive: false      // module is running
+    property bool frwStopped: false     // stop requested (button/UNWINDING); re-arm only by REWINDING
+    property string frwPhase: "IDLE"    // IDLE / FAST / SLOW
+    property int frwTargetErpm: 0
+    property int frwErpmNow: 0
+    property bool frwOverCurrent: false // holding max current instead of RPM
+
+    function frwStart() {
+        frwStopped = false
+        frwActive = true
+        frwPhase = "FAST"
+        frwOverCurrent = false
+        frwTargetErpm = Skypuff.rewindErpm()
+        frwErpmNow = 0
+        Skypuff.logSmotMsg("=== AUTO REWIND START (FAST) ===")
+    }
+
+    function frwStop(reason) {
+        if (!frwActive && frwPhase === "IDLE")
+            return
+        frwActive = false
+        frwPhase = "IDLE"
+        frwOverCurrent = false
+        VescIf.commands().setCurrent(0)
+        Skypuff.logSmotMsg("=== AUTO REWIND STOP: " + reason + " ===")
+    }
+
+    // Move frwErpmNow toward frwTargetErpm by one ramp step (50 ms tick)
+    function frwRampStep() {
+        var rampMs = Skypuff.rewindRamp() * 1000
+        var steps = Math.max(1, Math.round(rampMs / 50))
+        var step = frwTargetErpm / steps
+        if (frwErpmNow < frwTargetErpm)
+            frwErpmNow = Math.min(frwTargetErpm, frwErpmNow + step)
+        else if (frwErpmNow > frwTargetErpm)
+            frwErpmNow = Math.max(frwTargetErpm, frwErpmNow - step)
+    }
+
+    function frwTick() {
+        if (!frwActive || frwStopped)
+            return
+
+        var pos = Skypuff.drawnMeters
+        var amps = Skypuff.motorKg * cfg.amps_per_kg
+
+        // Rope reached zero -> done
+        if (pos <= 0.05) {
+            frwActive = false
+            frwPhase = "IDLE"
+            VescIf.commands().setCurrent(0)
+            Skypuff.logSmotMsg("=== AUTO REWIND DONE pos=0 ===")
+            return
+        }
+
+        // Safety zone: FAST forbidden closer than rewindSlowZone -> switch to SLOW
+        if (frwPhase === "FAST" && pos <= Skypuff.rewindSlowZone()) {
+            frwPhase = "SLOW"
+            frwTargetErpm = Skypuff.rewindSlowErpm()
+            frwOverCurrent = false
+            Skypuff.logSmotMsg("=== AUTO SLOW zone pos=" + pos.toFixed(1) + "м ===")
+        }
+
+        var maxCurrent = (frwPhase === "FAST") ? Skypuff.rewindMaxCurrent()
+                                               : Skypuff.rewindSlowMaxCurrent()
+
+        frwRampStep()
+
+        // Overcurrent hold (hysteresis 10 A)
+        if (amps > maxCurrent && !frwOverCurrent) {
+            frwOverCurrent = true
+            VescIf.commands().setCurrent(maxCurrent)
+        } else if (amps <= maxCurrent - 10 && frwOverCurrent) {
+            frwOverCurrent = false
+            VescIf.commands().setRpm(frwErpmNow)
+        } else if (!frwOverCurrent) {
+            VescIf.commands().setRpm(frwErpmNow)
+        }
+    }
+
     // скорость троса (м/с) → ERPM мотора
     function msToErpm(ms) {
         var mpr = (cfg.wheel_diameter_mm / 1000) / cfg.gear_ratio * Math.PI; // м на оборот вала
@@ -124,7 +206,12 @@ Page {
                     borderColor: Qt.darker(page.bgYellowColor, 1.2)
                 }
 
-                onClicked: {Skypuff.sendTerminal("set MANUAL_BRAKING")}
+                onClicked: {
+                    // Stop auto rewind module first, then put firmware into MANUAL_BRAKING
+                    frwStopped = true
+                    frwStop("STOP button")
+                    Skypuff.sendTerminal("set MANUAL_BRAKING")
+                }
             }
         }
 
@@ -411,6 +498,39 @@ Page {
             visible: true
         }*/
 
+        // ===== Auto rewind module: 50 ms command loop (overrides firmware) =====
+        Timer {
+            id: tAutoRewind
+            interval: 50
+            repeat: true
+            running: frwActive && !frwStopped && Skypuff.fastRewind()
+            onTriggered: frwTick()
+        }
+
+        Connections {
+            target: Skypuff
+            onStateChanged: {
+                var s = Skypuff.state
+                if (s === "REWINDING") {
+                    // (re)arm: only REWINDING can start the module
+                    if (Skypuff.fastRewind())
+                        frwStart()
+                } else if (s === "SLOWING" || s === "SLOW") {
+                    // keep running if already active (firmware zones may differ)
+                    if (frwActive && frwPhase === "IDLE")
+                        frwPhase = "FAST"
+                } else if (s === "UNWINDING") {
+                    // hard stop: UNWINDING kills the module, re-arm only on REWINDING
+                    frwStopped = true
+                    frwStop("UNWINDING")
+                } else {
+                    // any other state (MANUAL_BRAKING, BRAKING, PULL, DISCONNECTED...)
+                    // stops the module immediately
+                    frwStop(s)
+                }
+            }
+        }
+
         // Vertical space
         Item {
             Layout.fillHeight: true
@@ -621,12 +741,14 @@ Page {
                 bUnwinding.enabled = Skypuff.isBrakingExtensionRange
                 bUnwinding.state = "BRAKING_EXTENSION"
                 bPrePull.state = "PRE_PULL"
+                bStop.enabled = true
                 break
             case "SLOW":
             case "SLOWING":
                 bUnwinding.enabled = false
                 bPrePull.enabled = false
                 bPrePull.state = "PRE_PULL"
+                bStop.enabled = true
                 break
             case "PRE_PULL":
                 bPrePull.state = "TAKEOFF_PULL"

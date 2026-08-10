@@ -125,6 +125,10 @@ public:
     Q_INVOKABLE double rewindRamp();
     Q_INVOKABLE void setRewindRamp(double v);
 
+    // Write a line to the rewind session log (*smot.log) from QML
+    // (auto-rewind module markers). Thread-safe, no-op if logging off.
+    Q_INVOKABLE void logSmotMsg(const QString &line);
+
 signals:
     /* It is simple to work with QML text states:
      *
