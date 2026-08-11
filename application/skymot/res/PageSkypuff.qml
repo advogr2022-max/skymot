@@ -18,6 +18,7 @@ Page {
     property bool fastCurrentMode: false  // красная кнопка: true = держим ток 150А (перегрузка)
     property bool autoFastActive: false   // авто-FAST при REWINDING: APK сам шлёт setRpm(fastErpm) пока контроллер сматывает
     property bool autoSlowActive: false   // авто-SLOW при SLOWING: APK шлёт setRpm(slowErpm) пока контроллер замедляется
+    property bool stopPrevEnabled: false  // базовое состояние bStop (1.1.0) — восстанавливается при выходе из REWINDING/SLOWING/SLOW
 
     // скорость троса (м/с) → ERPM мотора
     function msToErpm(ms) {
@@ -580,6 +581,7 @@ Page {
                 bUnwinding.state = "UNWINDING"
                 if (state === "REWINDING") {
                     autoFastActive = false  // вышли из REWINDING — авто-FAST стоп; прошивка сама управляет (SLOWING/BRAKING/UNWINDING)
+                    bStop.enabled = stopPrevEnabled  // возврат к базовому (1.1.0) состоянию Stop
                 }
                 break
             case "BRAKING":
@@ -597,6 +599,8 @@ Page {
                 if (state === "SLOWING") {
                     autoSlowActive = false  // вышли из SLOWING — авто-SLOW стоп
                 }
+                if (state === "SLOWING" || state === "SLOW")
+                    bStop.enabled = stopPrevEnabled  // возврат к базовому (1.1.0) состоянию Stop
                 break
             case "FAST_PULL":
                 bPrePull.enabled = true
@@ -637,6 +641,7 @@ Page {
                 bUnwinding.state = "BRAKING_EXTENSION"
                 bPrePull.state = "PRE_PULL"
                 if (state === "REWINDING") {
+                    stopPrevEnabled = bStop.enabled  // базовое состояние Stop до входа в авто-режим
                     bStop.enabled = true  // Stop доступна во время авто-смотки
                     // Авто-FAST: контроллер начал сматывать — перекрываем медленный rewinding_current
                     // командой FAST (как при нажатой красной кнопке). Стоп — при выходе из REWINDING.
@@ -649,9 +654,11 @@ Page {
                 bUnwinding.enabled = false
                 bPrePull.enabled = false
                 bPrePull.state = "PRE_PULL"
-                if (state === "SLOWING" || state === "SLOW")
+                if (state === "SLOWING" || state === "SLOW") {
+                    stopPrevEnabled = bStop.enabled  // базовое состояние Stop до входа в авто-режим
                     bStop.enabled = true  // Stop доступна во время замедления
-                if (state === "SLOWING" ) {
+                }
+                if (state === "SLOWING") {
                     // Авто-SLOW: контроллер замедляется — держим скорость slowErpm (как зелёная кнопка)
                     autoSlowActive = true
                     VescIf.commands().setRpm(Skypuff.slowErpm())
