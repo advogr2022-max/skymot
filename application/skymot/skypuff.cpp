@@ -25,6 +25,7 @@
 #include "skypuff.h"
 #include "utility.h"
 #include "logwriter.h"
+#include "crashlogger.h"
 
 Skypuff::Skypuff(VescInterface *v) : QObject(),
     vesc(v),
@@ -220,6 +221,7 @@ void Skypuff::logSmotMsg(const QString &line)
 void Skypuff::setState(const skypuff_state newState)
 {
     if(state != newState) {
+        crashBreadcrumb("skypuff: setState");
         // Rewind session log markers
         if (newState == REWINDING) {
             logSmot(QStringLiteral("=== REWINDING START ==="));
@@ -406,6 +408,7 @@ void Skypuff::timerEvent(QTimerEvent *event)
     else if(event->timerId() == smotLogTimerId) {
         // Per-second rewind session record: state, rope length to zero, current, erpm
         if (state == REWINDING || state == SLOWING || state == SLOW) {
+            crashBreadcrumb("skypuff: smotTimer");
             const QString line = QDateTime::currentDateTime().toString("HH:mm:ss") + " " +
                     state_str(state) +
                     QString(" pos=%1м I=%2А erpm=%3")
@@ -492,6 +495,7 @@ void Skypuff::sendSettings(const QMLable_skypuff_config& cfg)
 
 void Skypuff::customAppDataReceived(QByteArray data)
 {
+    crashBreadcrumb("skypuff: customAppDataReceived");
     VByteArray vb(data);
 
     if(vb.length() < 1) {
@@ -633,6 +637,7 @@ void Skypuff::processSettingsApplied(VByteArray &/*vb*/)
 
 void Skypuff::processStats(VByteArray &vb, bool isTempsPacket)
 {
+    crashBreadcrumb("skypuff: processStats");
     // alive could be set from UI, timer is not necessary but possible
     if(aliveTimeoutTimerId) {
         updateStatsResponse(aliveResponseDelay.elapsed());

@@ -38,6 +38,11 @@ QT_LOGGING_RULES="qt.qml.connections=false"
 
 CONFIG += c++11
 CONFIG += resources_big
+
+# Diagnostic build: debug info + frame pointers so crash backtraces
+# (crashlogger) resolve to file:line via addr2line.
+QMAKE_CXXFLAGS += -g -fno-omit-frame-pointer
+QMAKE_CFLAGS += -g -fno-omit-frame-pointer
 ios: {
     QMAKE_CXXFLAGS_DEBUG += -Wall
 }
@@ -215,14 +220,16 @@ INCLUDEPATH += ../..
 
 SOURCES += main.cpp \
     skypuff.cpp \
-    qmlable_skypuff_types.cpp
+    qmlable_skypuff_types.cpp \
+    ../../crashlogger.cpp
 
 HEADERS += \
     missing_types.h \
     skypuff.h \
     app_skypuff.h \
     qmlable_skypuff_types.h \
-    logwriter.h
+    logwriter.h \
+    ../../crashlogger.h
     
 contains(DEFINES, HAS_BLUETOOTH) {
     SOURCES += ../../bleuart.cpp

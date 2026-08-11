@@ -32,6 +32,7 @@
 #include "vescinterface.h"
 #include "skypuff.h"
 #include "utility.h"
+#include "crashlogger.h"
 
 // ===== File logs: Download/Skymot/<yyyyMMdd_HHmm>.log (general) and
 // Download/Skymot/<yyyyMMdd_HHmm>smot.log (rewind session) =====
@@ -125,6 +126,7 @@ static void scanFileInMediaStore(const QString &path)
 
 static void initLogFile()
 {
+    crashBreadcrumb("initLogFile");
     __android_log_print(ANDROID_LOG_INFO, "SkymotLog", "initLogFile called");
     QString base = QDateTime::currentDateTime().toString("yyyyMMdd_HHmm");
     openLogFile(g_fileGeneral, base + ".log");
@@ -275,6 +277,11 @@ int main(int argc, char *argv[])
     qInstallMessageHandler(logMessageHandler);
     qDebug() << "=== Skymot starting ===";
     QTimer::singleShot(3000, &app, initLogFile);
+
+    // Crash handler: SIGSEGV/SIGABRT etc. -> breadcrumbs + backtrace to
+    // Download/Skymot/crash.log (diagnostic build only).
+    installCrashHandler();
+    crashBreadcrumb("main: handler installed");
 
     QQmlApplicationEngine engine;
 

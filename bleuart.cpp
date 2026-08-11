@@ -19,6 +19,7 @@
 
 #include "bleuart.h"
 #include "utility.h"
+#include "crashlogger.h"
 
 #include <QDebug>
 #include <QLowEnergyConnectionParameters>
@@ -61,6 +62,7 @@ void BleUart::startScan()
 
 void BleUart::startConnect(QString addr)
 {
+    crashBreadcrumb("ble: startConnect");
     init();
 
     disconnectBle();
@@ -229,6 +231,7 @@ void BleUart::serviceDiscovered(const QBluetoothUuid &gatt)
 
 void BleUart::serviceScanDone()
 {
+    crashBreadcrumb("ble: serviceScanDone");
     if (mService) {
         mService->deleteLater();
         mService = nullptr;
@@ -264,6 +267,7 @@ void BleUart::controllerError(QLowEnergyController::Error e)
 
 void BleUart::deviceConnected()
 {
+    crashBreadcrumb("ble: deviceConnected");
     qDebug() << "BLE device connected";
     mControl->discoverServices();
 }
@@ -326,6 +330,7 @@ void BleUart::serviceError(QLowEnergyService::ServiceError e){
 
 void BleUart::updateData(const QLowEnergyCharacteristic &c, const QByteArray &value)
 {
+    crashBreadcrumb("ble: updateData");
     if (c.uuid() == QBluetoothUuid(QUuid(mTxUuid))) {
         emit dataRx(value);
     }
