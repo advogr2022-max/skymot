@@ -10,7 +10,7 @@ VT_INTRO_VERSION = 1
 VT_CONFIG_VERSION = 2
 
 # Set to 0 for stable versions and to test version number for development versions.
-VT_VERSION = 1.4.1
+VT_VERSION = 1.4.2
 VT_INTRO_VERSION = 1
 VT_CONFIG_VERSION = 2
 VT_IS_TEST_VERSION = 0
@@ -19,9 +19,9 @@ VT_IS_TEST_VERSION = 0
 VT_GIT_COMMIT = $$system(git rev-parse --short=8 HEAD)
 
 # Skymot 1.4.1 (regression line from v1.1.0), minSdk 26 (Android 8), arm64-v8a only
-VT_ANDROID_VERSION_ARMV7 = 141
-VT_ANDROID_VERSION_ARM64 = 141
-VT_ANDROID_VERSION_X86 = 141
+VT_ANDROID_VERSION_ARMV7 = 142
+VT_ANDROID_VERSION_ARM64 = 142
+VT_ANDROID_VERSION_X86 = 142
 
 VT_ANDROID_VERSION = $$VT_ANDROID_VERSION_X86
 

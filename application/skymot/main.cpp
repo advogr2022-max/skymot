@@ -133,12 +133,19 @@ static void initLogFile()
     openLogFile(g_fileSmot, base + "smot.log");
 
     // Make the log files visible to file managers (MediaStore on Android 11+)
+    // ⚠️ DISABLED (diagnostic build v1.4.1-crashdbg-noscan): raw JNI
+    // scanFileInMediaStore() is the prime suspect for CheckJNI abort on BLE
+    // connect (QAndroidJniObject::fromString -> libart abort right inside
+    // BleUart::startConnect). Files still get written, just not registered
+    // in MediaStore. Re-enable after the crash is confirmed fixed.
+#if 0
     if (g_fileGeneral.isOpen()) {
         scanFileInMediaStore(g_fileGeneral.fileName());
     }
     if (g_fileSmot.isOpen()) {
         scanFileInMediaStore(g_fileSmot.fileName());
     }
+#endif
 
     QMutexLocker locker(&g_logMutex);
     QStringList pending = g_pendingLog;
