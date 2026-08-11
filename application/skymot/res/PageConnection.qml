@@ -142,7 +142,7 @@ Page {
         anchors.fill: parent
 
         Label {
-            text: qsTr("Find Skymot")
+            text: qsTr("Find Skymot ") + Skypuff.version()
 
             Layout.fillWidth: true
             Layout.topMargin: bBluetooth.size / 3

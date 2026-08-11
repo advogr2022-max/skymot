@@ -104,6 +104,11 @@ public:
     Q_INVOKABLE int slowErpm();
     Q_INVOKABLE void setSlowErpm(int v);
 
+    // App version (VT_VERSION from skypuff.pro), e.g. "1.5.0".
+    // Displayed on the Connection screen ("Find Skymot <version>") so a build
+    // is immediately identifiable. Kept in sync by the build (DEFINES).
+    Q_INVOKABLE QString version();
+
 signals:
     /* It is simple to work with QML text states:
      *
