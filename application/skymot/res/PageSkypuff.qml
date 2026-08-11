@@ -17,6 +17,8 @@ Page {
     property ConfigParams cfg: VescIf.appConfig()
     property bool fastCurrentMode: false  // красная кнопка: true = держим ток 150А (перегрузка)
     property bool autoFastActive: false   // авто-FAST при REWINDING: APK сам шлёт setRpm(fastErpm) пока контроллер сматывает
+    property bool autoSlowActive: false   // авто-SLOW при SLOWING: APK шлёт setRpm(slowErpm) пока контроллер замедляется
+    property bool automaticsEnabled: true // false после нажатия Stop — авто-режимы выключены до переподключения
 
     // скорость троса (м/с) → ERPM мотора
     function msToErpm(ms) {
@@ -125,7 +127,13 @@ Page {
                     borderColor: Qt.darker(page.bgYellowColor, 1.2)
                 }
 
-                onClicked: {Skypuff.sendTerminal("set MANUAL_BRAKING")}
+                onClicked: {
+                    // Стоп: отключаем авто-режимы (FAST/SLOW) и штатно переводим прошивку в ручное торможение
+                    automaticsEnabled = false
+                    autoFastActive = false
+                    autoSlowActive = false
+                    Skypuff.sendTerminal("set MANUAL_BRAKING")
+                }
             }
         }
 
@@ -368,10 +376,11 @@ Page {
         Connections {
             target: Skypuff
             onMotorKgChanged: {
-                if (rTestSpeed.pressed) {
+                if (rTestSpeed.pressed || autoSlowActive) {
                     var amps = Skypuff.motorKg * cfg.amps_per_kg;
                     if (amps > 150) {
                         rTestSpeed.pressed = false;
+                        autoSlowActive = false;
                         VescIf.commands().setCurrent(0);
                     }
                 }
@@ -586,6 +595,9 @@ Page {
             case "SLOW":
             case "SLOWING":
                 bPrePull.enabled = true
+                if (state === "SLOWING") {
+                    autoSlowActive = false  // вышли из SLOWING — авто-SLOW стоп
+                }
                 break
             case "FAST_PULL":
                 bPrePull.enabled = true
@@ -626,10 +638,13 @@ Page {
                 bUnwinding.state = "BRAKING_EXTENSION"
                 bPrePull.state = "PRE_PULL"
                 if (state === "REWINDING") {
+                    bStop.enabled = true  // Stop доступна во время авто-смотки
                     // Авто-FAST: контроллер начал сматывать — перекрываем медленный rewinding_current
                     // командой FAST (как при нажатой красной кнопке). Стоп — при выходе из REWINDING.
-                    autoFastActive = true
-                    VescIf.commands().setRpm(Skypuff.fastErpm())
+                    if (automaticsEnabled) {
+                        autoFastActive = true
+                        VescIf.commands().setRpm(Skypuff.fastErpm())
+                    }
                 }
                 break
             case "SLOW":
@@ -637,6 +652,13 @@ Page {
                 bUnwinding.enabled = false
                 bPrePull.enabled = false
                 bPrePull.state = "PRE_PULL"
+                if (state === "SLOWING" || state === "SLOW")
+                    bStop.enabled = true  // Stop доступна во время замедления
+                if (state === "SLOWING" && automaticsEnabled) {
+                    // Авто-SLOW: контроллер замедляется — держим скорость slowErpm (как зелёная кнопка)
+                    autoSlowActive = true
+                    VescIf.commands().setRpm(Skypuff.slowErpm())
+                }
                 break
             case "PRE_PULL":
                 bPrePull.state = "TAKEOFF_PULL"
@@ -654,6 +676,10 @@ Page {
                 bStop.enabled = false
                 bPrePull.enabled = false
                 pullForce.enabled = false
+                // Переподключение — автоматика снова разрешена
+                automaticsEnabled = true
+                autoFastActive = false
+                autoSlowActive = false
                 break
             }
         }
@@ -686,7 +712,7 @@ Page {
         id: tAutoFast
         interval: 100
         repeat: true
-        running: autoFastActive && Skypuff.state === "REWINDING" && !rTestCurrent.pressed && !rTestSpeed.pressed
+        running: autoFastActive && automaticsEnabled && Skypuff.state === "REWINDING" && !rTestCurrent.pressed && !rTestSpeed.pressed
         onTriggered: {
             if (fastCurrentMode) {
                 VescIf.commands().setCurrent(150)
@@ -694,5 +720,15 @@ Page {
                 VescIf.commands().setRpm(Skypuff.fastErpm())
             }
         }
+    }
+
+    // Авто-SLOW при SLOWING: повторяем команду SLOW каждые 100 мс, пока контроллер замедляется
+    // (как удержание зелёной кнопки: скорость slowErpm; при перегрузке >150А — аварийный стоп)
+    Timer {
+        id: tAutoSlow
+        interval: 100
+        repeat: true
+        running: autoSlowActive && automaticsEnabled && Skypuff.state === "SLOWING" && !rTestCurrent.pressed && !rTestSpeed.pressed
+        onTriggered: VescIf.commands().setRpm(Skypuff.slowErpm())
     }
 }

@@ -10,7 +10,7 @@ VT_INTRO_VERSION = 1
 VT_CONFIG_VERSION = 2
 
 # Set to 0 for stable versions and to test version number for development versions.
-VT_VERSION = 1.5.1
+VT_VERSION = 1.5.2
 VT_INTRO_VERSION = 1
 VT_CONFIG_VERSION = 2
 VT_IS_TEST_VERSION = 0
@@ -18,10 +18,10 @@ VT_IS_TEST_VERSION = 0
 # GIT commit
 VT_GIT_COMMIT = $$system(git rev-parse --short=8 HEAD)
 
-# Skymot 1.5.1 (from ddosoff/vesc_tool skypuff 6.05), minSdk 26 (Android 8), arm64-v8a only
-VT_ANDROID_VERSION_ARMV7 = 151
-VT_ANDROID_VERSION_ARM64 = 151
-VT_ANDROID_VERSION_X86 = 151
+# Skymot 1.5.2 (from ddosoff/vesc_tool skypuff 6.05), minSdk 26 (Android 8), arm64-v8a only
+VT_ANDROID_VERSION_ARMV7 = 152
+VT_ANDROID_VERSION_ARM64 = 152
+VT_ANDROID_VERSION_X86 = 152
 
 VT_ANDROID_VERSION = $$VT_ANDROID_VERSION_X86
 
