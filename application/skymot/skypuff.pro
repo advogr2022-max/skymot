@@ -10,7 +10,7 @@ VT_INTRO_VERSION = 1
 VT_CONFIG_VERSION = 2
 
 # Set to 0 for stable versions and to test version number for development versions.
-VT_VERSION = 1.1.0
+VT_VERSION = 2.0.0
 VT_INTRO_VERSION = 1
 VT_CONFIG_VERSION = 2
 VT_IS_TEST_VERSION = 0
@@ -18,17 +18,17 @@ VT_IS_TEST_VERSION = 0
 # GIT commit
 VT_GIT_COMMIT = $$system(git rev-parse --short=8 HEAD)
 
-# Skymot 1.1.0 (from ddosoff/vesc_tool skypuff 6.05), minSdk 26 (Android 8), arm64-v8a only
-VT_ANDROID_VERSION_ARMV7 = 110
-VT_ANDROID_VERSION_ARM64 = 110
-VT_ANDROID_VERSION_X86 = 110
+# Skymot 2.0.0 (from ddosoff/vesc_tool skypuff 6.05), minSdk 26 (Android 8), arm64-v8a only
+VT_ANDROID_VERSION_ARMV7 = 200
+VT_ANDROID_VERSION_ARM64 = 200
+VT_ANDROID_VERSION_X86 = 200
 
 VT_ANDROID_VERSION = $$VT_ANDROID_VERSION_X86
 
 # Ubuntu 18.04 (should work on raspbian buster too)
 # sudo apt install qml-module-qt-labs-folderlistmodel qml-module-qtquick-extras qml-module-qtquick-controls2 qt5-default libqt5quickcontrols2-5 qtquickcontrols2-5-dev qtcreator qtcreator-doc libqt5serialport5-dev build-essential qml-module-qt3d qt3d5-dev qtdeclarative5-dev qtconnectivity5-dev qtmultimedia5-dev qtpositioning5-dev qtpositioning5-dev libqt5gamepad5-dev qml-module-qt-labs-settings qml-module-qt-labs-platform libqt5svg5-dev
 
-DEFINES += VT_VERSION=$$VT_VERSION
+DEFINES += VT_VERSION=\\\"$$VT_VERSION\\\"
 DEFINES += VT_INTRO_VERSION=$$VT_INTRO_VERSION
 DEFINES += VT_CONFIG_VERSION=$$VT_CONFIG_VERSION
 DEFINES += VT_IS_TEST_VERSION=$$VT_IS_TEST_VERSION

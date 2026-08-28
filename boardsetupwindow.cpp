@@ -24,7 +24,7 @@ BoardSetupWindow::BoardSetupWindow(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    mVersion = QString::number(VT_VERSION, 'f', 2);
+    mVersion = QString::fromUtf8(VT_VERSION);
     mVesc = new VescInterface(this);
 
     mStatusInfoTime = 0;
