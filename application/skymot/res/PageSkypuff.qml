@@ -328,11 +328,15 @@ Page {
                 font.pixelSize: 20
                 Material.background: "#388E3C"
                 Material.foreground: "white"
-                // Разрешены состояния, где прошивка не пишет мотор в steady state
-                // (UNWINDING/REWINDING: ток ставится один раз, вмешательства только по событиям)
+                // Зелёная кнопка разрешена ДОПОЛНИТЕЛЬНО в тормозных/замедляющих состояниях
+                // (SLOWING, SLOW, BRAKING, BRAKING_EXTENSION) — нужно тянуть по нажатию и в них.
+                // Безопасно: прошивка в этих состояниях задаёт мотор ОДИН РАЗ на входе
+                // (smooth_motor_brake/smooth_motor_speed -> next_smooth_motor_adjustment = INT_MAX),
+                // а BRAKING перекладывает тормоз только по таймауту VESC (наши команды его сбрасывают).
                 enabled: ["DISCONNECTED", "UNINITIALIZED", "MANUAL_BRAKING", "MANUAL_SLOW",
                           "MANUAL_SLOW_SPEED_UP", "MANUAL_SLOW_BACK",
-                          "MANUAL_SLOW_BACK_SPEED_UP", "UNWINDING", "REWINDING"].indexOf(Skypuff.state) !== -1
+                          "MANUAL_SLOW_BACK_SPEED_UP", "UNWINDING", "REWINDING",
+                          "SLOWING", "SLOW", "BRAKING", "BRAKING_EXTENSION"].indexOf(Skypuff.state) !== -1
                 onPressed:  VescIf.commands().setRpm(Skypuff.slowErpm())
                 onReleased: VescIf.commands().setCurrent(0)
             }
