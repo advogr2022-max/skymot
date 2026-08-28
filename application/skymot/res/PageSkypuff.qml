@@ -253,6 +253,10 @@ Page {
             stateText: Skypuff.stateText
             status: Skypuff.fault
 
+            // Красная надпись состояния, пока приложение шлёт мотору свои команды:
+            // авто-смотка (без нажатия) или нажатая кнопка FAST/SLOW. Обычный режим — чёрная.
+            appOverride: page.autoFastActive || rTestCurrent.pressed || rTestSpeed.pressed
+
             Connections {
                 target: Skypuff
 

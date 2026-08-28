@@ -36,6 +36,9 @@ Item {
     property string motorMode: 'Not Connected'
     property string state: 'DISCONNECTED'
     property string stateText: 'Disconnected'
+    // true, пока приложение само шлёт команды мотору: авто-смотка или нажатая кнопка FAST/SLOW.
+    // Надпись состояния в этот момент красная — видно, что мотором рулит приложение, а не только FSM.
+    property bool appOverride: false
     property string status
     property string fault
 
@@ -1596,7 +1599,7 @@ Item {
                 anchors.top: parent.top
                 antialiasing: true
                 font.pixelSize: Math.max(10, root.diameter * 0.06)
-                color: root.state === "MANUAL_BRAKING" ? root.dangerTextColor : root.textColor;
+                color: (root.appOverride || root.state === "MANUAL_BRAKING") ? root.dangerTextColor : root.textColor;
 
                 property real mDown: root.gaugeHeight * 2.8
 
