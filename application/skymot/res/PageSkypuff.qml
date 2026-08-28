@@ -28,6 +28,9 @@ Page {
     property real skBrakingMeters: 30
     property real skSlowingMeters: 55
 
+    // Граница жёсткого запрета для красной кнопки FAST: конец зоны замедления (по умолчанию 30 + 55 = 85 м)
+    property real fastMinMeters: page.skBrakingMeters + page.skSlowingMeters
+
     // скорость троса (м/с) → ERPM мотора
     function msToErpm(ms) {
         var mpr = (page.skWheelDiameterMm / 1000) / page.skGearRatio * Math.PI; // м на оборот вала
@@ -299,9 +302,14 @@ Page {
                 Material.foreground: "white"
                 // Разрешены состояния, где прошивка не пишет мотор в steady state
                 // (UNWINDING/REWINDING: ток ставится один раз, вмешательства только по событиям)
-                enabled: ["DISCONNECTED", "UNINITIALIZED", "MANUAL_BRAKING", "MANUAL_SLOW",
-                          "MANUAL_SLOW_SPEED_UP", "MANUAL_SLOW_BACK",
-                          "MANUAL_SLOW_BACK_SPEED_UP", "UNWINDING", "REWINDING"].indexOf(Skypuff.state) !== -1
+                // + ЖЁСТКОЕ ОГРАНИЧЕНИЕ ПО ПОЗИЦИИ: FAST запрещена ближе конца зоны замедления
+                // (braking_length + slowing_length, по умолчанию 30 + 55 = 85 м) — там смоткой
+                // управляет прошивка (SLOWING/SLOW/BRAKING) и пилот у земли.
+                // В DISCONNECTED позиции нет и мотор не подключён — кнопка остаётся для стендовой проверки.
+                enabled: (["DISCONNECTED", "UNINITIALIZED", "MANUAL_BRAKING", "MANUAL_SLOW",
+                           "MANUAL_SLOW_SPEED_UP", "MANUAL_SLOW_BACK",
+                           "MANUAL_SLOW_BACK_SPEED_UP", "UNWINDING", "REWINDING"].indexOf(Skypuff.state) !== -1)
+                         && (Skypuff.state === "DISCONNECTED" || Skypuff.drawnMeters > page.fastMinMeters)
                 onPressed:  { fastCurrentMode = false; VescIf.commands().setRpm(Skypuff.fastErpm()) }
                 onReleased: { fastCurrentMode = false; VescIf.commands().setCurrent(0) }
             }
@@ -367,6 +375,14 @@ Page {
             repeat: true
             running: rTestCurrent.pressed
             onTriggered: {
+                // ЖЁСТКИЙ СТОП по позиции: подошли к границе зоны замедления (85 м по умолчанию) —
+                // мгновенно снимаем тягу и отпускаем кнопку, даже если палец на ней
+                if (Skypuff.state !== "DISCONNECTED" && Skypuff.drawnMeters <= page.fastMinMeters) {
+                    rTestCurrent.pressed = false
+                    fastCurrentMode = false
+                    VescIf.commands().setCurrent(0)
+                    return
+                }
                 if (fastCurrentMode) {
                     VescIf.commands().setCurrent(150)
                 } else {
