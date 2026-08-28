@@ -17,10 +17,26 @@ Page {
     property ConfigParams cfg: VescIf.appConfig()
     property bool fastCurrentMode: false  // красная кнопка: true = держим ток 150А (перегрузка)
 
+    // ВАЖНО: page.cfg — это appConfig VESC, в нём НЕТ полей лебёдки (amps_per_kg, wheel_diameter_mm,
+    // gear_ratio, motor_poles, длины зон). Они приходят из прошивки сигналом
+    // Skypuff.settingsChanged(cfg) и кэшируются здесь. Раньше код читал их прямо из page.cfg,
+    // получал undefined и NaN — из-за чего защита по току 150А и msToErpm() не работали ВООБЩЕ.
+    property real skAmpsPerKg: 3.333
+    property real skWheelDiameterMm: 270
+    property real skGearRatio: 1
+    property int  skMotorPoles: 32
+    property real skBrakingMeters: 30
+    property real skSlowingMeters: 55
+
     // скорость троса (м/с) → ERPM мотора
     function msToErpm(ms) {
-        var mpr = (cfg.wheel_diameter_mm / 1000) / cfg.gear_ratio * Math.PI; // м на оборот вала
-        return (ms / mpr * 60) * (cfg.motor_poles / 2);
+        var mpr = (page.skWheelDiameterMm / 1000) / page.skGearRatio * Math.PI; // м на оборот вала
+        return (ms / mpr * 60) * (page.skMotorPoles / 2);
+    }
+
+    // ток мотора (А): Skypuff.motorKg в C++ уже поделён на amps_per_kg, возвращаем обратно амперы
+    function motorAmps() {
+        return Skypuff.motorKg * page.skAmpsPerKg;
     }
     state: "DISCONNECTED"
 
@@ -372,7 +388,7 @@ Page {
             target: Skypuff
             onMotorKgChanged: {
                 if (rTestSpeed.pressed) {
-                    var amps = Skypuff.motorKg * cfg.amps_per_kg;
+                    var amps = motorAmps();
                     if (amps > 150) {
                         rTestSpeed.pressed = false;
                         VescIf.commands().setCurrent(0);
@@ -388,7 +404,7 @@ Page {
             target: Skypuff
             onMotorKgChanged: {
                 if (rTestCurrent.pressed) {
-                    var amps = Skypuff.motorKg * cfg.amps_per_kg;
+                    var amps = motorAmps();
                     if (amps > 150 && !fastCurrentMode) {
                         fastCurrentMode = true;
                         VescIf.commands().setCurrent(150);
@@ -671,6 +687,14 @@ Page {
             pullForce.to = cfg.motor_max_kg
             pullForce.stepSize = cfg.motor_max_kg / 30
             pullForce.value = cfg.pull_kg
+
+            // Кэш параметров лебёдки для защиты по току, msToErpm() и границы запрета FAST
+            page.skAmpsPerKg = cfg.amps_per_kg
+            page.skWheelDiameterMm = cfg.wheel_diameter_mm
+            page.skGearRatio = cfg.gear_ratio
+            page.skMotorPoles = cfg.motor_poles
+            page.skBrakingMeters = cfg.braking_length_meters
+            page.skSlowingMeters = cfg.slowing_length_meters
         }
     }
 }
