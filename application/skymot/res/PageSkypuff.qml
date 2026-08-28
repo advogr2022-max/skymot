@@ -31,6 +31,23 @@ Page {
     // Граница жёсткого запрета для красной кнопки FAST: конец зоны замедления (по умолчанию 30 + 55 = 85 м)
     property real fastMinMeters: page.skBrakingMeters + page.skSlowingMeters
 
+    // ===== Авто-смотка (автоматический аналог красной кнопки) =====
+    // Включается: состояние REWINDING держится непрерывно дольше 2 с И трос дальше fastMinMeters (85 м).
+    // Команды те же, что у кнопки FAST: setRpm(fastErpm) каждые 100 мс + удержание 150 А при перегрузе.
+    // Выключается: пересечение границы 85 м, выход из REWINDING, кнопка Stop.
+    // Ручные кнопки имеют приоритет: пока нажата любая из них, авто-режим команды не шлёт.
+    property bool autoFastActive: false        // авто-режим шлёт команды прямо сейчас
+    property bool autoFastCurrentMode: false   // авто-режим держит ток 150 А (перегрузка)
+    property bool autoFastBlocked: false       // запрет до следующего входа в REWINDING (нажали Stop)
+
+    function autoFastStop() {
+        if (page.autoFastActive) {
+            page.autoFastActive = false
+            page.autoFastCurrentMode = false
+            VescIf.commands().setCurrent(0)
+        }
+    }
+
     // скорость троса (м/с) → ERPM мотора
     function msToErpm(ms) {
         var mpr = (page.skWheelDiameterMm / 1000) / page.skGearRatio * Math.PI; // м на оборот вала
@@ -143,7 +160,11 @@ Page {
                     borderColor: Qt.darker(page.bgYellowColor, 1.2)
                 }
 
-                onClicked: {Skypuff.sendTerminal("set MANUAL_BRAKING")}
+                onClicked: {
+                    page.autoFastBlocked = true   // Stop гасит авто-смотку до следующего входа в REWINDING
+                    page.autoFastStop()
+                    Skypuff.sendTerminal("set MANUAL_BRAKING")
+                }
             }
         }
 
@@ -298,7 +319,8 @@ Page {
                 implicitWidth: 100
                 implicitHeight: 100
                 font.pixelSize: 20
-                Material.background: "#D32F2F"
+                // Оранжевая, пока работает авто-смотка (мотор тянет без нажатия) — видно, что режим активен
+                Material.background: page.autoFastActive ? "#FF6D00" : "#D32F2F"
                 Material.foreground: "white"
                 // Разрешены состояния, где прошивка не пишет мотор в steady state
                 // (UNWINDING/REWINDING: ток ставится один раз, вмешательства только по событиям)
@@ -397,6 +419,48 @@ Page {
             repeat: true
             running: rTestSpeed.pressed
             onTriggered: VescIf.commands().setRpm(Skypuff.slowErpm())
+        }
+
+        // Взвод авто-смотки: REWINDING непрерывно дольше 2 с и трос дальше границы 85 м.
+        // Любое нарушение условия обнуляет отсчёт (Timer перезапускается при running false->true).
+        Timer {
+            id: tAutoFastArm
+            interval: 2000
+            repeat: false
+            running: Skypuff.state === "REWINDING"
+                     && Skypuff.drawnMeters > page.fastMinMeters
+                     && !page.autoFastBlocked && !page.autoFastActive
+                     && !rTestCurrent.pressed && !rTestSpeed.pressed
+            onTriggered: {
+                page.autoFastCurrentMode = false
+                page.autoFastActive = true
+            }
+        }
+
+        // Авто-смотка: те же команды и защиты, что у красной кнопки, но без нажатия
+        Timer {
+            id: tAutoFast
+            interval: 100
+            repeat: true
+            running: page.autoFastActive && !rTestCurrent.pressed && !rTestSpeed.pressed
+            onTriggered: {
+                // Жёсткие условия выхода: вышли из REWINDING или пересекли границу 85 м
+                if (Skypuff.state !== "REWINDING" || Skypuff.drawnMeters <= page.fastMinMeters) {
+                    page.autoFastStop()
+                    return
+                }
+
+                var amps = motorAmps()
+                if (amps > 150 && !page.autoFastCurrentMode)
+                    page.autoFastCurrentMode = true
+                else if (amps < 140 && page.autoFastCurrentMode)
+                    page.autoFastCurrentMode = false
+
+                if (page.autoFastCurrentMode)
+                    VescIf.commands().setCurrent(150)
+                else
+                    VescIf.commands().setRpm(Skypuff.fastErpm())
+            }
         }
 
         // Защита зелёной кнопки: ток > 150А → стоп
@@ -691,6 +755,12 @@ Page {
         }
 
         onStateChanged: {
+            // Авто-смотка живёт только внутри REWINDING; выход из него гасит её и снимает запрет от Stop
+            if (newState !== "REWINDING") {
+                page.autoFastStop()
+                page.autoFastBlocked = false
+            }
+
             if(page.state !== newState) {
                 onExit(page.state)
                 onEnter(newState)
