@@ -93,6 +93,11 @@ void Skypuff::setSlowErpm(int v)
     s.setValue("skypuff/slow_erpm", v);
 }
 
+QString Skypuff::version()
+{
+    return QString::fromUtf8(VT_VERSION);
+}
+
 void Skypuff::setState(const skypuff_state newState)
 {
     if(state != newState) {

@@ -777,6 +777,13 @@ Page {
                                 onValueModified: Skypuff.setSlowErpm(value)
                             }
                         }
+                        // Build identification: app version (VT_VERSION) right under the ERPM fields
+                        RowLayout {
+                            Text {
+                                text: qsTr("Skymot version") + ": " + Skypuff.version()
+                            }
+                            Item {Layout.fillWidth: true}
+                        }
                     }
                 }
             }
