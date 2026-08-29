@@ -57,6 +57,9 @@ Skypuff::Skypuff(VescInterface *v) : QObject(),
         if (!s.contains("skypuff/slow_erpm")) {
             s.setValue("skypuff/slow_erpm", 3000);
         }
+        if (!s.contains("skypuff/fast_min_meters")) {
+            s.setValue("skypuff/fast_min_meters", 85);
+        }
     }
 }
 
@@ -91,6 +94,20 @@ void Skypuff::setSlowErpm(int v)
 {
     QSettings s;
     s.setValue("skypuff/slow_erpm", v);
+}
+
+// Минимальная позиция троса (метры), ближе которой красная кнопка FAST и авто-смотка запрещены.
+// Хранится в телефоне, на VESC не отправляется. Диапазон в UI: 10..100 м, по умолчанию 85 м.
+int Skypuff::fastMinMeters()
+{
+    QSettings s;
+    return s.value("skypuff/fast_min_meters", 85).toInt();
+}
+
+void Skypuff::setFastMinMeters(int v)
+{
+    QSettings s;
+    s.setValue("skypuff/fast_min_meters", v);
 }
 
 QString Skypuff::version()

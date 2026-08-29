@@ -28,18 +28,18 @@ Page {
     property real skBrakingMeters: 30
     property real skSlowingMeters: 55
 
-    // Граница жёсткого запрета для красной кнопки FAST и авто-смотки.
-    // ЖЁСТКОЕ ЧИСЛО 85 м — НЕ вычисляется из настроек прошивки!
-    // История: сначала граница считалась как braking_length + slowing_length (на дефолтах 30 + 55 = 85 м),
-    // но на реальной лебёдке зоны настроены меньше, и граница уехала на единицы метров —
-    // кнопка становилась активной на 6 м. Теперь 85 м — это константа, а зоны лишь могут её УВЕЛИЧИТЬ
-    // (если у прошивки зона замедления длиннее 85 м, запрет расширяется до неё, но никогда не сужается).
-    property real fastLimitFloorMeters: 85
-    property real fastMinMeters: Math.max(page.fastLimitFloorMeters,
-                                          page.skBrakingMeters + page.skSlowingMeters)
+    // Граница жёсткого запрета для красной кнопки FAST и авто-смотки — из НАСТРОЕК:
+    // Config -> Test buttons -> "FAST min position (m)", диапазон 10..100 м, по умолчанию 85 м.
+    // Читается функцией на каждой проверке (значение живёт в QSettings), поэтому смена настройки
+    // действует сразу, без перезапуска приложения.
+    // История: в 2.0.0 граница вычислялась как braking_length + slowing_length (на дефолтах 30 + 55 = 85),
+    // но на реальной лебёдке зоны короче — граница уехала на единицы метров и FAST включалась на 6 м.
+    function fastLimitMeters() {
+        return Skypuff.fastMinMeters()
+    }
 
     // ===== Авто-смотка (автоматический аналог красной кнопки) =====
-    // Включается: состояние REWINDING держится непрерывно дольше 2 с И трос дальше fastMinMeters (85 м).
+    // Включается: состояние REWINDING держится непрерывно дольше 2 с И трос дальше границы из настроек (FAST min position, дефолт 85 м).
     // Команды те же, что у кнопки FAST: setRpm(fastErpm) каждые 100 мс + удержание 150 А при перегрузе.
     // Выключается: пересечение границы 85 м, выход из REWINDING, кнопка Stop.
     // Ручные кнопки имеют приоритет: пока нажата любая из них, авто-режим команды не шлёт.
@@ -342,7 +342,7 @@ Page {
                 enabled: (["DISCONNECTED", "UNINITIALIZED", "MANUAL_BRAKING", "MANUAL_SLOW",
                            "MANUAL_SLOW_SPEED_UP", "MANUAL_SLOW_BACK",
                            "MANUAL_SLOW_BACK_SPEED_UP", "UNWINDING", "REWINDING"].indexOf(Skypuff.state) !== -1)
-                         && (Skypuff.state === "DISCONNECTED" || Skypuff.drawnMeters > page.fastMinMeters)
+                         && (Skypuff.state === "DISCONNECTED" || Skypuff.drawnMeters > page.fastLimitMeters())
                 onPressed:  { fastCurrentMode = false; VescIf.commands().setRpm(Skypuff.fastErpm()) }
                 onReleased: { fastCurrentMode = false; VescIf.commands().setCurrent(0) }
             }
@@ -410,7 +410,7 @@ Page {
             onTriggered: {
                 // ЖЁСТКИЙ СТОП по позиции: подошли к границе зоны замедления (85 м по умолчанию) —
                 // мгновенно снимаем тягу и отпускаем кнопку, даже если палец на ней
-                if (Skypuff.state !== "DISCONNECTED" && Skypuff.drawnMeters <= page.fastMinMeters) {
+                if (Skypuff.state !== "DISCONNECTED" && Skypuff.drawnMeters <= page.fastLimitMeters()) {
                     rTestCurrent.pressed = false
                     fastCurrentMode = false
                     VescIf.commands().setCurrent(0)
@@ -439,7 +439,7 @@ Page {
             interval: 2000
             repeat: false
             running: Skypuff.state === "REWINDING"
-                     && Skypuff.drawnMeters > page.fastMinMeters
+                     && Skypuff.drawnMeters > page.fastLimitMeters()
                      && !page.autoFastBlocked && !page.autoFastActive
                      && !rTestCurrent.pressed && !rTestSpeed.pressed
             onTriggered: {
@@ -456,7 +456,7 @@ Page {
             running: page.autoFastActive && !rTestCurrent.pressed && !rTestSpeed.pressed
             onTriggered: {
                 // Жёсткие условия выхода: вышли из REWINDING или пересекли границу 85 м
-                if (Skypuff.state !== "REWINDING" || Skypuff.drawnMeters <= page.fastMinMeters) {
+                if (Skypuff.state !== "REWINDING" || Skypuff.drawnMeters <= page.fastLimitMeters()) {
                     page.autoFastStop()
                     return
                 }

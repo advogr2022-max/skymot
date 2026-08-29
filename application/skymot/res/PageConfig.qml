@@ -761,6 +761,24 @@ Page {
                         }
                         RowLayout {
                             Text {
+                                text: qsTr('FAST min position (<a href="help">m</a>)')
+                                onLinkActivated: VescIf.emitMessageDialog(qsTr("FAST minimum position"),
+                                                                          qsTr("Hard limit for the red FAST button and for automatic fast rewinding: they are forbidden when the rope is closer than this distance (10..100 m, default 85 m). Inside this distance the winch is controlled by the firmware (SLOWING / SLOW / BRAKING). The green SLOW button is not limited. Stored on the phone, not sent to the VESC."),
+                                                                          false, false);
+                            }
+                            Item {Layout.fillWidth: true}
+                            SpinBox {
+                                id: fastMinMeters
+                                editable: true
+                                from: 10
+                                to: 100
+                                stepSize: 5
+                                value: Skypuff.fastMinMeters()
+                                onValueModified: Skypuff.setFastMinMeters(value)
+                            }
+                        }
+                        RowLayout {
+                            Text {
                                 text: qsTr('SLOW button ERPM (<a href="help">?</a>)')
                                 onLinkActivated: VescIf.emitMessageDialog(qsTr("SLOW button speed"),
                                                                           qsTr("Motor ERPM for the green SLOW button on the control screen. Stored on the phone, not sent to the VESC."),

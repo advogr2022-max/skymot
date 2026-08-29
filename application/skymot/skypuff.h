@@ -104,6 +104,10 @@ public:
     Q_INVOKABLE int slowErpm();
     Q_INVOKABLE void setSlowErpm(int v);
 
+    // Запрет красной кнопки FAST и авто-смотки ближе этой позиции троса (метры, 10..100, дефолт 85)
+    Q_INVOKABLE int fastMinMeters();
+    Q_INVOKABLE void setFastMinMeters(int v);
+
     // App version (VT_VERSION from skypuff.pro), e.g. "2.0.0".
     // Displayed on the Config screen under "SLOW button ERPM" so a build
     // is immediately identifiable. Kept in sync by the build (DEFINES).
