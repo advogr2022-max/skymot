@@ -28,8 +28,15 @@ Page {
     property real skBrakingMeters: 30
     property real skSlowingMeters: 55
 
-    // Граница жёсткого запрета для красной кнопки FAST: конец зоны замедления (по умолчанию 30 + 55 = 85 м)
-    property real fastMinMeters: page.skBrakingMeters + page.skSlowingMeters
+    // Граница жёсткого запрета для красной кнопки FAST и авто-смотки.
+    // ЖЁСТКОЕ ЧИСЛО 85 м — НЕ вычисляется из настроек прошивки!
+    // История: сначала граница считалась как braking_length + slowing_length (на дефолтах 30 + 55 = 85 м),
+    // но на реальной лебёдке зоны настроены меньше, и граница уехала на единицы метров —
+    // кнопка становилась активной на 6 м. Теперь 85 м — это константа, а зоны лишь могут её УВЕЛИЧИТЬ
+    // (если у прошивки зона замедления длиннее 85 м, запрет расширяется до неё, но никогда не сужается).
+    property real fastLimitFloorMeters: 85
+    property real fastMinMeters: Math.max(page.fastLimitFloorMeters,
+                                          page.skBrakingMeters + page.skSlowingMeters)
 
     // ===== Авто-смотка (автоматический аналог красной кнопки) =====
     // Включается: состояние REWINDING держится непрерывно дольше 2 с И трос дальше fastMinMeters (85 м).

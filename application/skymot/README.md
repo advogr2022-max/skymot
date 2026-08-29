@@ -50,7 +50,7 @@
 
 ### 4. `skypuff.pro` — версия
 
-`VT_VERSION = 2.0.0`, коды Android-версий 200. Сборка целевая — **arm64-v8a**
+`VT_VERSION = 2.0.1`, коды Android-версий 201. Сборка целевая — **arm64-v8a**
 (см. `qmake ANDROID_ABIS="arm64-v8a"` в инструкции; размер APK ~26 МБ).
 
 ### 5. Настройки ERPM кнопок FAST/SLOW (v1.1.0)
